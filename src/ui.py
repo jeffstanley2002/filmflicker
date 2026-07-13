@@ -41,7 +41,10 @@ def movie_card(movie_row, links_row=None, badge=None):
     title = movie_row["title"]
 
     if meta and meta.get("poster_url"):
-        st.image(meta["poster_url"], use_container_width=True)
+        # streamlit==1.38.0 (pinned in requirements.txt) predates st.image's
+        # use_container_width param - use_column_width is the equivalent for
+        # this version.
+        st.image(meta["poster_url"], use_column_width=True)
     else:
         color = omdb.genre_color(genres)
         st.markdown(
