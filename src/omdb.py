@@ -55,6 +55,8 @@ def _get_api_key():
 def get_cache_conn() -> sqlite3.Connection:
     CACHE_DB.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(CACHE_DB, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
     conn.execute(
         """CREATE TABLE IF NOT EXISTS omdb_cache (
             imdb_id TEXT PRIMARY KEY,
@@ -99,7 +101,10 @@ def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
         resp = requests.get(OMDB_URL, params={"i": imdb_id, "apikey": api_key}, timeout=5)
         resp.raise_for_status()
         data = resp.json()
-    except requests.RequestException:
+    except (requests.RequestException, ValueError):
+        # ValueError covers resp.json() failing to parse (e.g. OMDb returning
+        # an HTML error/rate-limit page instead of JSON) - a network hiccup
+        # here should degrade to a placeholder card, not crash the page.
         return empty
 
     if data.get("Response") != "True":

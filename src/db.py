@@ -37,9 +37,17 @@ CREATE TABLE IF NOT EXISTS ratings (
 
 
 def get_connection(db_path: Path = APP_DB_PATH) -> sqlite3.Connection:
+    """A single connection is shared across all Streamlit sessions/threads
+    (see src/cache.py's st.cache_resource wrapper) - safe from corruption
+    since Python's sqlite3 module here reports threadsafety level 3
+    (serialized), but WAL mode + a busy timeout meaningfully cuts down on
+    "database is locked" errors under concurrent writes from multiple
+    simultaneous visitors."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
     conn.executescript(_SCHEMA)
     conn.commit()
     return conn

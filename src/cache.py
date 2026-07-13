@@ -76,6 +76,7 @@ def load_metrics():
 
 @st.cache_data(show_spinner=False)
 def fetch_omdb(imdb_id):
-    # Cache key is imdb_id only; the sqlite connection itself is not
-    # hashable-friendly for st.cache_data, so we open it fresh here (cheap).
-    return omdb.fetch_metadata(imdb_id)
+    # get_omdb_conn() is itself st.cache_resource-wrapped, so this reuses
+    # the one shared connection instead of opening a new sqlite connection
+    # on every single poster lookup.
+    return omdb.fetch_metadata(imdb_id, conn=get_omdb_conn())

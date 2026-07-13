@@ -34,10 +34,17 @@ if submitted:
 
 filtered = movies.copy()
 if query:
-    filtered = filtered[filtered["title"].str.contains(query, case=False, na=False)]
+    # regex=False: the search box is a plain-text field, not a regex prompt -
+    # without this, characters like "(" (common in movie titles/queries)
+    # raise an uncaught re.error and crash the page.
+    filtered = filtered[filtered["title"].str.contains(query, case=False, na=False, regex=False)]
 if genre_filter:
     filtered = filtered[filtered["genre_list"].apply(lambda gs: any(g in gs for g in genre_filter))]
-filtered = filtered[(filtered["year"].fillna(0) >= year_range[0]) & (filtered["year"].fillna(9999) <= year_range[1])]
+# A few dozen MovieLens titles have no parseable release year (e.g. "Moonlight",
+# "Ready Player One"). Keep them visible regardless of the year slider instead
+# of silently hiding real, popular movies because of a data-quality gap.
+year_col = filtered["year"]
+filtered = filtered[year_col.isna() | ((year_col >= year_range[0]) & (year_col <= year_range[1]))]
 
 filtered = filtered.join(pop_df[["count", "mean", "weighted_score"]], on="movieId")
 sort_map = {

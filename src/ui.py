@@ -31,14 +31,13 @@ def profile_sidebar():
 
 
 def movie_card(movie_row, links_row=None, badge=None):
-    """Renders a poster (or genre-colored placeholder) + title/year/genres
-    inside the current Streamlit container. Returns nothing; caller decides
-    what interactive widgets go below the card."""
+    """Renders a poster (or genre-colored placeholder) + title/genres inside
+    the current Streamlit container. Returns nothing; caller decides what
+    interactive widgets go below the card."""
     imdb_id = links_row["imdbId"] if links_row is not None else None
     meta = cache.fetch_omdb(imdb_id) if imdb_id else {"poster_url": None}
 
     genres = movie_row.get("genre_list", [])
-    year = movie_row.get("year")
     title = movie_row["title"]
 
     if meta and meta.get("poster_url"):
