@@ -1,13 +1,12 @@
-import sqlite3
-
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from src import db
 
 
 @pytest.fixture
 def conn(tmp_path):
-    return db.get_connection(tmp_path / "test.db")
+    return db.get_connection(f"sqlite:///{tmp_path}/test.db")
 
 
 def test_get_or_create_profile_is_idempotent(conn):
@@ -54,9 +53,9 @@ def test_set_rating_upserts_existing_rating(conn):
 
 def test_rating_out_of_range_is_rejected_at_db_level(conn):
     pid = db.get_or_create_profile(conn, "alice")
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(IntegrityError):
         db.set_rating(conn, pid, movie_id=7, rating=6.0)
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(IntegrityError):
         db.set_rating(conn, pid, movie_id=7, rating=0.0)
 
 

@@ -83,7 +83,7 @@ every user's top-N, regardless of model).
 - **App:** Streamlit (multi-page), Altair for charts
 - **ML:** scikit-learn (TF-IDF, TruncatedSVD, KMeans), Keras/TensorFlow (offline only)
 - **Data:** MovieLens `ml-latest-small` (~100K ratings, 9.7K movies), committed to the repo
-- **Storage:** SQLite (profiles/watched/ratings), OMDb response cache
+- **Storage:** SQLAlchemy Core over SQLite (local/default) or Postgres (once `DATABASE_URL` is set - see below), OMDb response cache
 - **Optional:** OMDb API for real posters (free key), graceful placeholder fallback otherwise
 
 ## Testing
@@ -121,6 +121,33 @@ To enable real posters, copy `.streamlit/secrets.toml.example` to
 key the app runs fine — movies just render as genre-colored placeholder
 cards instead of posters.
 
+## Setting up Postgres (Supabase) for real persistent users
+
+Local dev and a quick demo deploy both work with **zero setup** - `src/db.py`
+falls back to a local SQLite file automatically. But Streamlit Community
+Cloud's filesystem is ephemeral (it resets on every restart/redeploy), so
+if real users are going to create profiles and expect their watched
+list/ratings to stick around, point the app at a free hosted Postgres
+instead:
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In your project's **Settings → Database**, copy the **Connection
+   string** (URI format, "Session pooler" mode is fine for this app's
+   traffic level).
+3. Append `?sslmode=require` to the end of it.
+4. Set it as `DATABASE_URL`:
+   - **Locally** (optional, to test against the real DB before deploying):
+     add to `.streamlit/secrets.toml` alongside `OMDB_API_KEY`.
+   - **Deployed**: paste into Streamlit Cloud's **Settings → Secrets**.
+5. Redeploy (or just rerun locally) - `src/db.py` detects `DATABASE_URL`
+   automatically and switches from SQLite to Postgres, creating the same
+   `profiles`/`watched`/`ratings` tables (Postgres-flavored DDL) on first
+   connection. No code changes needed either way.
+
+If `DATABASE_URL` is never set, the app just keeps using local SQLite -
+fine for a personal demo, not for real users who expect their data to
+persist.
+
 ## Deploying for free (Streamlit Community Cloud)
 
 1. Push this repo to your own GitHub account (public or private).
@@ -130,16 +157,11 @@ cards instead of posters.
 3. In the app's **Settings → Secrets**, paste:
    ```toml
    OMDB_API_KEY = "your_key_here"
+   DATABASE_URL = "postgresql://...?sslmode=require"  # optional, see above
    ```
-   (Skip this if you're fine with placeholder cards instead of posters.)
+   (Both are optional — the app degrades gracefully without either.)
 4. Deploy. First build takes a few minutes; `models/` and `data/` are
    already committed, so no training happens at deploy time.
-
-**Note on persistence:** Streamlit Community Cloud's filesystem is
-ephemeral — the SQLite-backed profiles/watched/ratings reset whenever the
-app restarts or redeploys. That's an acceptable tradeoff for a portfolio
-demo; a production version would point `src/db.py` at a hosted Postgres
-(e.g. Supabase's free tier) instead.
 
 ## Project structure
 
