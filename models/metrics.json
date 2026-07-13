@@ -1,0 +1,37 @@
+{
+  "k": 10,
+  "n_eval_users": 150,
+  "rating_prediction": {
+    "collaborative": {
+      "rmse": 1.2822041561905475,
+      "mae": 0.9521122220939781
+    },
+    "neural": {
+      "rmse": 1.0951473437914265,
+      "mae": 0.8995092573993979
+    }
+  },
+  "top_n": {
+    "popularity": {
+      "precision_at_10": 0.025333333333333333,
+      "recall_at_10": 0.019414594458485746
+    },
+    "content_based": {
+      "precision_at_10": 0.010666666666666668,
+      "recall_at_10": 0.00644609012396423
+    },
+    "collaborative": {
+      "precision_at_10": 0.050666666666666665,
+      "recall_at_10": 0.0467188596086117
+    },
+    "clustering": {
+      "precision_at_10": 0.046,
+      "recall_at_10": 0.04291280496500405
+    },
+    "neural": {
+      "precision_at_10": 0.0013333333333333335,
+      "recall_at_10": 0.0004360165118679051
+    }
+  },
+  "notes": "80/20 random split of ratings.csv. Collaborative/clustering/neural retrained on the train split only; content-based and popularity use rating-weighted profiles built from each test user's train-split ratings only. New/cold profiles fall back to popularity - not reflected in these per-user metrics."
+}

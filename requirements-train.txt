@@ -1,0 +1,5 @@
+# Extra dependencies needed ONLY to run scripts/train_models.py locally
+# (specifically the neural embedding model). Not installed on the deployed
+# app - see models/neural.py, which serves pre-trained embeddings with numpy.
+-r requirements.txt
+tensorflow==2.16.1
