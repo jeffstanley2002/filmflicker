@@ -20,14 +20,28 @@ from src import data_utils
 from src.recommenders import clustering, collaborative, content_based, neural, popularity
 
 EMBED_DIM = 16
+LATENT_DIM = 16  # shared space the two towers project into for the dot product
 EPOCHS = 8
 BATCH_SIZE = 256
 
 
 def build_and_train_neural(movies, ratings, epochs: int = EPOCHS) -> dict:
-    """Trains the Keras model and returns the exportable weights dict
-    (does not touch disk) - reused by both the production training run and
-    scripts/evaluate_models.py's held-out evaluation."""
+    """Trains a two-tower (Neural CF style) Keras model and returns the
+    exportable weights dict (does not touch disk) - reused by both the
+    production training run and scripts/evaluate_models.py's held-out
+    evaluation.
+
+    Architecture: user tower (user embedding -> dense) and item tower
+    (movie embedding + genre features -> dense) each project into a shared
+    LATENT_DIM space; prediction = dot(user_vec, item_vec) + user_bias +
+    item_bias, trained on rating-minus-global-mean (so biases only need to
+    learn a *deviation*, matching how the SVD model is mean-centered too).
+
+    This replaced an earlier concat-everything-then-MLP design that turned
+    out to lean heavily on item popularity rather than sharp personalization
+    (see README/Model Comparison page) - forcing the interaction through an
+    explicit dot product is the standard fix for that failure mode.
+    """
     from tensorflow import keras
     from tensorflow.keras import layers
 
@@ -47,7 +61,8 @@ def build_and_train_neural(movies, ratings, epochs: int = EPOCHS) -> dict:
     u_idx = ratings["userId"].map(user_pos).values.astype(np.int32)
     m_idx = ratings["movieId"].map(movie_pos).values.astype(np.int32)
     g_feat = genre_matrix[m_idx]
-    y = ratings["rating"].values.astype(np.float32)
+    global_mean = float(ratings["rating"].mean())
+    y = ratings["rating"].values.astype(np.float32) - global_mean  # train on the residual
 
     rng = np.random.default_rng(42)
     n = len(y)
@@ -69,13 +84,20 @@ def build_and_train_neural(movies, ratings, epochs: int = EPOCHS) -> dict:
     reg = keras.regularizers.l2(1e-6)
     user_embedding = layers.Embedding(n_users, EMBED_DIM, embeddings_regularizer=reg, name="user_embedding")(user_input)
     movie_embedding = layers.Embedding(n_movies, EMBED_DIM, embeddings_regularizer=reg, name="movie_embedding")(movie_input)
-    user_vec = layers.Flatten()(user_embedding)
-    movie_vec = layers.Flatten()(movie_embedding)
+    movie_bias_emb = layers.Embedding(n_movies, 1, embeddings_regularizer=reg, name="movie_bias")(movie_input)
+    user_bias_emb = layers.Embedding(n_users, 1, embeddings_regularizer=reg, name="user_bias")(user_input)
 
-    x = layers.Concatenate()([user_vec, movie_vec, genre_input])
-    x = layers.Dense(32, activation="relu", name="dense_1")(x)
-    x = layers.Dense(16, activation="relu", name="dense_2")(x)
-    out = layers.Dense(1, activation="linear", name="dense_out")(x)
+    user_vec_in = layers.Flatten()(user_embedding)
+    movie_vec_in = layers.Flatten()(movie_embedding)
+    movie_bias = layers.Flatten()(movie_bias_emb)
+    user_bias = layers.Flatten()(user_bias_emb)
+
+    user_tower = layers.Dense(LATENT_DIM, activation="relu", name="user_tower")(user_vec_in)
+    item_concat = layers.Concatenate()([movie_vec_in, genre_input])
+    item_tower = layers.Dense(LATENT_DIM, activation="relu", name="item_tower")(item_concat)
+
+    dot = layers.Dot(axes=1, name="dot")([user_tower, item_tower])
+    out = layers.Add(name="add_biases")([dot, user_bias, movie_bias])
 
     model = keras.Model(inputs=[user_input, movie_input, genre_input], outputs=out)
     model.compile(optimizer="adam", loss="mse", metrics=["mae"])
@@ -92,18 +114,18 @@ def build_and_train_neural(movies, ratings, epochs: int = EPOCHS) -> dict:
         verbose=2,
     )
 
-    W1, b1 = model.get_layer("dense_1").get_weights()
-    W2, b2 = model.get_layer("dense_2").get_weights()
-    W3, b3 = model.get_layer("dense_out").get_weights()
+    Wi, bi = model.get_layer("item_tower").get_weights()
 
     return {
-        "user_emb": model.get_layer("user_embedding").get_weights()[0],
+        # Only what's needed to serve NEW profiles at inference time (see
+        # src/recommenders/neural.py) - the user tower/embedding/bias are
+        # used during training but never at serve time, since every app
+        # profile is a cold-start fold-in, never a "known" MovieLens user.
         "movie_emb": model.get_layer("movie_embedding").get_weights()[0],
+        "movie_bias": model.get_layer("movie_bias").get_weights()[0].ravel(),
         "genre_matrix": genre_matrix,
-        "W1": W1, "b1": b1,
-        "W2": W2, "b2": b2,
-        "W3": W3, "b3": b3,
-        "user_ids": user_ids,
+        "Wi": Wi, "bi": bi,
+        "global_mean": np.float32(global_mean),
         "movie_ids": movie_ids,
     }
 

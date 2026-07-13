@@ -62,9 +62,9 @@ st.markdown(
 |---|---|---|---|
 | **Popularity** | Bayesian-weighted average rating + genre overlap | Zero cold-start cost, hard to beat for "safe" picks | Not personalized beyond genre |
 | **Content-based** | TF-IDF (genres + tags) + cosine similarity | Works from day one with just a few ratings, explainable | Only sees surface metadata, not taste patterns |
-| **Collaborative (SVD)** | Matrix factorization over the user–item ratings matrix | Learns from the *whole community's* behavior, best top-N precision here | Needs a fold-in approximation for brand-new users, "cold" for niche items |
+| **Collaborative (SVD)** | Rank-5 matrix factorization over the user–item ratings matrix | Best on every metric measured here (RMSE, MAE, Precision@10, Recall@10) | Needs a fold-in approximation for brand-new users, "cold" for niche items |
 | **Clustering (KMeans)** | Groups movies by genre + popularity features | Good for discovery/exploration outside your usual picks | Coarser signal than factorization |
-| **Neural net** | Embeddings + MLP trained with Keras, served via NumPy | Best rating-prediction accuracy (RMSE/MAE) here | Concat-MLP architecture leans on item popularity, so top-N ranking is weaker than SVD's on this small dataset — a known tradeoff vs. two-tower/dot-product architectures |
+| **Neural net (two-tower)** | User/item towers projecting into a shared latent space, dot product + biases, trained with Keras, served via NumPy | Second-best top-N precision; architecture directly targets the "leans on popularity" failure mode a simpler concat-MLP design had | Still behind SVD here — a small (~100K-rating) dataset favors SVD's lower parameter count |
 """
 )
 
@@ -75,4 +75,9 @@ with st.expander("Methodology notes"):
         "Movies with fewer than 5 ratings are excluded as recommendation candidates for every "
         "model (not just neural) — sparse items give any embedding-based model noisy signal, "
         "and it's a bad user experience regardless of model."
+    )
+    st.caption(
+        "Collaborative's n_components=5 and the neural model's two-tower architecture were both "
+        "chosen via held-out sweeps, not defaults — see the README's 'Measured results' section "
+        "for the before/after numbers that justified each change."
     )

@@ -86,7 +86,7 @@ with st.expander("How the 5 models work"):
 - **Content-based** — TF-IDF over genres + community tags, cosine similarity. Only needs *what a movie is about*, not other users.
 - **Collaborative filtering** — matrix factorization (TruncatedSVD) over the user–item ratings matrix; predicts your rating for movies based on patterns across everyone's ratings.
 - **Clustering** — KMeans groups movies into taste clusters; you get recommendations from whichever cluster your watched movies fall into most.
-- **Neural network** — an embedding + dense-layer model trained offline with Keras/TensorFlow, served at runtime with plain NumPy (no TensorFlow needed in production).
+- **Neural network** — a two-tower model (user/item embeddings projected into a shared space, combined via dot product) trained offline with Keras/TensorFlow, served at runtime with plain NumPy (no TensorFlow needed in production).
 
 See the **Model Comparison** page for measured accuracy (RMSE/MAE, Precision@10/Recall@10) on a held-out test split.
         """

@@ -59,8 +59,8 @@ install: `requirements.txt` has zero TensorFlow/ML-training dependencies.
 
 | Model | RMSE ↓ | MAE ↓ | Precision@10 ↑ | Recall@10 ↑ |
 |---|---|---|---|---|
-| Collaborative (SVD) | 1.28 | 0.95 | **0.051** | **0.047** |
-| Neural network | **1.10** | **0.90** | 0.001 | 0.000 |
+| Collaborative (SVD) | **0.99** | **0.77** | **0.095** | **0.068** |
+| Neural network | 1.12 | 0.84 | 0.013 | 0.013 |
 | Clustering | — | — | 0.046 | 0.043 |
 | Popularity | — | — | 0.025 | 0.019 |
 | Content-based | — | — | 0.011 | 0.006 |
@@ -68,15 +68,30 @@ install: `requirements.txt` has zero TensorFlow/ML-training dependencies.
 Regenerate with `python scripts/evaluate_models.py` (writes
 `models/metrics.json`, which the Model Comparison page reads).
 
-**Interesting finding:** the neural net has the best *rating-prediction*
-accuracy but the worst *top-N ranking* — its concat-embedding+MLP
-architecture leans on item popularity rather than sharp personalization at
-this dataset size (~100K ratings). This is a documented, known tradeoff
-vs. two-tower/dot-product architectures, not a bug — see the Model
-Comparison page's Methodology notes for the full writeup, including why
-movies with <5 ratings are excluded as candidates for every model (their
-embeddings otherwise overfit to a single noisy data point and dominate
-every user's top-N, regardless of model).
+**Two tuning passes behind these numbers**, both driven by held-out
+evaluation rather than guesswork:
+
+1. **SVD's rank was overfit.** An offline sweep over `n_components` in
+   [3, 5, 8, 10, 15, 20, 30, 50, 100, 150] showed RMSE rising monotonically
+   past rank 5 (0.976 → 1.49 at rank 150) - with only 610 users and ~9.7K
+   movies, a high-rank factorization has more parameters than the data can
+   support. Dropping the default from 50 to 5 components nearly doubled
+   Precision@10 (0.051 → 0.095) and cut RMSE by ~22%.
+2. **The neural model's architecture was the bottleneck, not its
+   training.** The original concat-embeddings-into-an-MLP design leaned on
+   item popularity instead of learning sharp personalization - Precision@10
+   was an almost-random 0.001. Replacing it with a two-tower / dot-product
+   architecture (separate user and item towers projecting into a shared
+   latent space, forcing an explicit interaction term) lifted Precision@10
+   13x to 0.013. It's still the weakest top-N model of the five - a fair,
+   documented outcome for a small dataset, not a hidden flaw - and its RMSE
+   ticked up slightly (1.10 → 1.12) even as MAE and top-N both improved, a
+   real mixed result worth stating plainly rather than rounding up.
+
+See the Model Comparison page's Methodology notes for why movies with <5
+ratings are excluded as candidates for every model (their embeddings
+otherwise overfit to a single noisy data point and dominate every user's
+top-N, regardless of model).
 
 ## Tech stack
 

@@ -31,7 +31,7 @@ MODEL_OPTIONS = {
     "Content-based (TF-IDF similarity)": "content_based",
     "Collaborative filtering (SVD)": "collaborative",
     "Clustering (explore your taste cluster)": "clustering",
-    "Neural network (embeddings + MLP)": "neural",
+    "Neural network (two-tower embeddings)": "neural",
 }
 
 if not watched_ids:

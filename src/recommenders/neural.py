@@ -1,15 +1,21 @@
 """Neural collaborative filtering, served WITHOUT a TensorFlow dependency.
 
-The model (user embedding + movie embedding + genre features -> small MLP
--> predicted rating) is trained offline with Keras in scripts/train_models.py.
-Only the trained weight matrices are exported (see NeuralWeights below); at
-serve time this module reimplements the forward pass in plain numpy, which
-keeps the deployed app's dependency footprint tiny and its cold start fast.
+Two-tower architecture (classic Neural CF style), trained offline with
+Keras in scripts/train_models.py: a user tower and an item tower (movie
+embedding + genre features) each project into a shared latent space, and
+the predicted rating is dot(user_vec, item_vec) + user_bias + item_bias
++ global_mean. Only the item tower's weights are exported (see
+save_weights/load below) - the user tower is used during training but
+never at serve time, since every profile the app ever predicts for is a
+cold-start fold-in, never a "known" MovieLens user with a trained
+embedding. At serve time this module reimplements the item tower's
+forward pass in plain numpy, keeping the deployed app's dependency
+footprint tiny and its cold start fast.
 
-New profiles (outside the original MovieLens user set) get an "implied"
-embedding: a rating-weighted average of the embeddings of movies they've
-rated - the same fold-in idea used for the SVD model, just at the
-embedding layer instead of the factor layer.
+New profiles get an "implied" vector: a rating-weighted (mean-centered)
+average of the *item tower's output* for movies they've rated - directly
+in the shared latent space, which is the principled two-tower version of
+the same fold-in idea used for the SVD model.
 """
 from pathlib import Path
 
@@ -26,40 +32,37 @@ def relu(x):
 
 class NeuralRecommender:
     def __init__(self, weights: dict):
-        self.user_emb = weights["user_emb"]  # (n_users, d)
-        self.movie_emb = weights["movie_emb"]  # (n_movies, d)
+        self.movie_emb = weights["movie_emb"]  # (n_movies, embed_dim)
+        self.movie_bias = weights["movie_bias"]  # (n_movies,)
         self.genre_matrix = weights["genre_matrix"]  # (n_movies, n_genres)
-        self.W1, self.b1 = weights["W1"], weights["b1"]
-        self.W2, self.b2 = weights["W2"], weights["b2"]
-        self.W3, self.b3 = weights["W3"], weights["b3"]
-        self.user_ids = weights["user_ids"]
+        self.Wi, self.bi = weights["Wi"], weights["bi"]  # item tower: Dense(embed_dim+n_genres -> latent_dim)
+        self.global_mean = float(weights["global_mean"])
         self.movie_ids = weights["movie_ids"]
         self.movie_idx = {int(m): i for i, m in enumerate(self.movie_ids)}
-        self.user_idx = {int(u): i for i, u in enumerate(self.user_ids)}
 
-    def _forward(self, user_vecs: np.ndarray, movie_idxs: np.ndarray) -> np.ndarray:
-        x = np.concatenate([user_vecs, self.movie_emb[movie_idxs], self.genre_matrix[movie_idxs]], axis=1)
-        h1 = relu(x @ self.W1 + self.b1)
-        h2 = relu(h1 @ self.W2 + self.b2)
-        out = h2 @ self.W3 + self.b3
-        return out.ravel()
+    def _item_tower(self, movie_idxs: np.ndarray) -> np.ndarray:
+        x = np.concatenate([self.movie_emb[movie_idxs], self.genre_matrix[movie_idxs]], axis=1)
+        return relu(x @ self.Wi + self.bi)  # (n, latent_dim)
 
     def implied_user_vector(self, rated: dict) -> np.ndarray:
         known = {m: r for m, r in rated.items() if m in self.movie_idx}
         if not known:
-            return np.zeros(self.user_emb.shape[1], dtype=np.float32)
-        idxs = [self.movie_idx[m] for m in known]
-        weights = np.array(list(known.values()), dtype=np.float32)
-        weights = weights / weights.sum()
-        return self.movie_emb[idxs].T.dot(weights)
+            return np.zeros(self.Wi.shape[1], dtype=np.float32)
+        idxs = np.array([self.movie_idx[m] for m in known], dtype=np.int64)
+        item_vecs = self._item_tower(idxs)
+        # Mean-centered (not sum-normalized): weights can be negative for
+        # disliked movies, and normalizing by their sum would blow up or
+        # flip sign when positive/negative ratings nearly cancel out.
+        weights = np.array([r - self.global_mean for r in known.values()], dtype=np.float32)
+        return (item_vecs * weights[:, None]).mean(axis=0)
 
     def predict_for_profile(self, rated: dict, movie_ids) -> np.ndarray:
-        user_vec = self.implied_user_vector(rated)
         idxs = np.array([self.movie_idx[m] for m in movie_ids if m in self.movie_idx], dtype=np.int64)
         if len(idxs) == 0:
             return idxs, np.array([], dtype=np.float32)
-        user_vecs = np.tile(user_vec, (len(idxs), 1))
-        preds = self._forward(user_vecs, idxs)
+        user_vec = self.implied_user_vector(rated)
+        item_vecs = self._item_tower(idxs)
+        preds = self.global_mean + item_vecs.dot(user_vec) + self.movie_bias[idxs]
         return idxs, np.clip(preds, 0.5, 5.0)
 
     def recommend_for_profile(self, rated: dict, n: int = 10, exclude_ids=None) -> list:
