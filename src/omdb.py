@@ -5,12 +5,24 @@ get None back and the UI falls back to a clean placeholder card.
 """
 import os
 import sqlite3
+import threading
 from pathlib import Path
 
 import requests
 
 CACHE_DB = Path(__file__).resolve().parent.parent / "app_data" / "omdb_cache.db"
 OMDB_URL = "https://www.omdbapi.com/"
+
+# fetch_metadata is called concurrently from a thread pool (see
+# cache.fetch_omdb_batch) but a single sqlite3.Connection is shared across
+# those threads (see get_cache_conn). SQLite's C library is safe for that
+# (threadsafety level 3), but the *Python* Connection object's own
+# transaction bookkeeping isn't - concurrent execute()/commit() calls on one
+# Connection from different threads can interleave and raise "cannot commit
+# - no transaction is active". This lock only guards the fast local read/
+# write; the slow network call stays outside it, so pages still fetch
+# posters in genuine parallel.
+_CACHE_LOCK = threading.Lock()
 
 # Deterministic placeholder color per genre so cards stay visually distinct
 # even without real posters.
@@ -86,10 +98,11 @@ def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
     imdb_id = _normalize_imdb_id(imdb_id)
     conn = conn or get_cache_conn()
 
-    row = conn.execute(
-        "SELECT poster_url, plot, director, runtime FROM omdb_cache WHERE imdb_id = ?",
-        (imdb_id,),
-    ).fetchone()
+    with _CACHE_LOCK:
+        row = conn.execute(
+            "SELECT poster_url, plot, director, runtime FROM omdb_cache WHERE imdb_id = ?",
+            (imdb_id,),
+        ).fetchone()
     if row:
         return {"poster_url": row[0], "plot": row[1], "director": row[2], "runtime": row[3]}
 
@@ -109,11 +122,12 @@ def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
 
     if data.get("Response") != "True":
         # Cache the miss too, so we don't hammer OMDb for movies it doesn't have.
-        conn.execute(
-            "INSERT OR REPLACE INTO omdb_cache (imdb_id, poster_url, plot, director, runtime) VALUES (?,?,?,?,?)",
-            (imdb_id, None, None, None, None),
-        )
-        conn.commit()
+        with _CACHE_LOCK:
+            conn.execute(
+                "INSERT OR REPLACE INTO omdb_cache (imdb_id, poster_url, plot, director, runtime) VALUES (?,?,?,?,?)",
+                (imdb_id, None, None, None, None),
+            )
+            conn.commit()
         return empty
 
     def clean(v):
@@ -125,9 +139,10 @@ def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
         "director": clean(data.get("Director")),
         "runtime": clean(data.get("Runtime")),
     }
-    conn.execute(
-        "INSERT OR REPLACE INTO omdb_cache (imdb_id, poster_url, plot, director, runtime) VALUES (?,?,?,?,?)",
-        (imdb_id, result["poster_url"], result["plot"], result["director"], result["runtime"]),
-    )
-    conn.commit()
+    with _CACHE_LOCK:
+        conn.execute(
+            "INSERT OR REPLACE INTO omdb_cache (imdb_id, poster_url, plot, director, runtime) VALUES (?,?,?,?,?)",
+            (imdb_id, result["poster_url"], result["plot"], result["director"], result["runtime"]),
+        )
+        conn.commit()
     return result

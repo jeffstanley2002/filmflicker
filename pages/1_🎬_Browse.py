@@ -6,9 +6,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import streamlit as st
 
 from src import cache, db
-from src.ui import movie_card, profile_sidebar
+from src.ui import inject_custom_css, movie_card, profile_sidebar
 
 st.set_page_config(page_title="Browse — CineMatch", page_icon="🎬", layout="wide")
+inject_custom_css()
 profile_sidebar()
 st.title("🎬 Browse movies")
 
@@ -66,25 +67,43 @@ page_df = filtered.iloc[start : start + PAGE_SIZE]
 
 conn = cache.get_db_conn()
 profile_id = st.session_state.get("profile_id")
-watched_ids = db.get_watched_ids(conn, profile_id) if profile_id else set()
 
-cols = st.columns(4)
-for i, row in enumerate(page_df.itertuples()):
-    with cols[i % 4]:
-        movie_row = {"title": row.title, "genre_list": row.genre_list, "year": row.year}
-        links_row = links.loc[row.movieId] if row.movieId in links.index else None
-        rating_txt = f"{row.mean:.1f}★ ({int(row.count)} ratings)" if row.count else "No ratings yet"
-        movie_card(movie_row, links_row, badge=rating_txt)
 
-        if not profile_id:
-            st.caption("Pick a profile on Home to track watched movies.")
-        else:
-            is_watched = row.movieId in watched_ids
-            label = "✅ Watched" if is_watched else "Mark watched"
-            if st.button(label, key=f"watch_{row.movieId}", use_container_width=True):
-                db.toggle_watched(conn, profile_id, row.movieId)
-                st.rerun()
-        st.divider()
+@st.fragment
+def _render_grid(page_df, links, conn, profile_id):
+    # Fetch all posters for this page in parallel up front instead of one
+    # blocking network call per card - cuts a 20-poster cold page load from
+    # ~14s to ~1-2s (warm/cached loads are already instant either way).
+    imdb_ids = [
+        links.loc[mid, "imdbId"] for mid in page_df["movieId"] if mid in links.index
+    ]
+    with st.spinner("Loading posters..."):
+        meta_by_imdb = cache.fetch_omdb_batch(imdb_ids)
+
+    watched_ids = db.get_watched_ids(conn, profile_id) if profile_id else set()
+
+    cols = st.columns(4)
+    for i, row in enumerate(page_df.itertuples()):
+        with cols[i % 4]:
+            movie_row = {"title": row.title, "genre_list": row.genre_list, "year": row.year}
+            links_row = links.loc[row.movieId] if row.movieId in links.index else None
+            imdb_id = links_row["imdbId"] if links_row is not None else None
+            meta = meta_by_imdb.get(imdb_id)
+            rating_txt = f"{row.mean:.1f}★ ({int(row.count)} ratings)" if row.count else "No ratings yet"
+            with st.container(border=True):
+                movie_card(movie_row, links_row, badge=rating_txt, meta=meta)
+
+                if not profile_id:
+                    st.caption("Pick a profile on Home to track watched movies.")
+                else:
+                    is_watched = row.movieId in watched_ids
+                    label = "✅ Watched" if is_watched else "Mark watched"
+                    if st.button(label, key=f"watch_{row.movieId}", use_container_width=True):
+                        db.toggle_watched(conn, profile_id, row.movieId)
+                        st.rerun(scope="fragment")
+
+
+_render_grid(page_df, links, conn, profile_id)
 
 nav1, nav2, nav3 = st.columns([1, 2, 1])
 with nav1:

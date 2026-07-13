@@ -8,9 +8,10 @@ import pandas as pd
 import streamlit as st
 
 from src import cache
-from src.ui import profile_sidebar
+from src.ui import inject_custom_css, profile_sidebar
 
 st.set_page_config(page_title="Model Comparison — CineMatch", page_icon="🧪", layout="wide")
+inject_custom_css()
 profile_sidebar()
 st.title("🧪 Model comparison")
 st.caption(

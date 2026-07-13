@@ -8,9 +8,10 @@ import streamlit as st
 from src import cache, db
 from src.recommenders import clustering, collaborative, content_based, neural, popularity
 from src.recommenders.base import low_signal_movie_ids
-from src.ui import movie_card, profile_sidebar, require_profile
+from src.ui import inject_custom_css, movie_card, profile_sidebar, require_profile
 
 st.set_page_config(page_title="Recommendations — CineMatch", page_icon="✨", layout="wide")
+inject_custom_css()
 profile_sidebar()
 profile_id, profile_name = require_profile()
 st.title("✨ Recommendations")
@@ -78,9 +79,16 @@ else:
             model = cache.load_neural()
             recs = model.recommend_for_profile(rated, n=12, exclude_ids=exclude)
 
-if not recs:
-    st.warning("Not enough signal yet for this model — try rating a few more movies, or switch models.")
-else:
+@st.fragment
+def _render_recs_grid(recs, movies, links, conn, profile_id):
+    imdb_ids = [
+        links.loc[r.movie_id, "imdbId"]
+        for r in recs
+        if r.movie_id in movies.index and r.movie_id in links.index
+    ]
+    with st.spinner("Loading posters..."):
+        meta_by_imdb = cache.fetch_omdb_batch(imdb_ids)
+
     cols = st.columns(4)
     for i, rec in enumerate(recs):
         if rec.movie_id not in movies.index:
@@ -89,11 +97,18 @@ else:
         with cols[i % 4]:
             movie_row = {"title": row["title"], "genre_list": row["genre_list"], "year": row["year"]}
             links_row = links.loc[rec.movie_id] if rec.movie_id in links.index else None
-            movie_card(movie_row, links_row, badge=rec.reason)
-            if st.button("Mark watched", key=f"rec_watch_{rec.movie_id}", use_container_width=True):
-                db.toggle_watched(conn, profile_id, rec.movie_id)
-                st.rerun()
-            st.divider()
+            imdb_id = links_row["imdbId"] if links_row is not None else None
+            with st.container(border=True):
+                movie_card(movie_row, links_row, badge=rec.reason, meta=meta_by_imdb.get(imdb_id))
+                if st.button("Mark watched", key=f"rec_watch_{rec.movie_id}", use_container_width=True):
+                    db.toggle_watched(conn, profile_id, rec.movie_id)
+                    st.rerun(scope="fragment")
+
+
+if not recs:
+    st.warning("Not enough signal yet for this model — try rating a few more movies, or switch models.")
+else:
+    _render_recs_grid(recs, movies, links, conn, profile_id)
 
 st.divider()
 st.subheader("Because you watched...")
@@ -106,6 +121,14 @@ else:
     artifacts = cache.load_content_based()
     similar = content_based.similar_to_movie(seed_id, artifacts, n=8, exclude_ids=exclude)
     if similar:
+        similar_imdb_ids = [
+            links.loc[r.movie_id, "imdbId"]
+            for r in similar
+            if r.movie_id in movies.index and r.movie_id in links.index
+        ]
+        with st.spinner("Loading posters..."):
+            similar_meta = cache.fetch_omdb_batch(similar_imdb_ids)
+
         cols = st.columns(4)
         for i, rec in enumerate(similar):
             if rec.movie_id not in movies.index:
@@ -114,4 +137,6 @@ else:
             with cols[i % 4]:
                 movie_row = {"title": row["title"], "genre_list": row["genre_list"], "year": row["year"]}
                 links_row = links.loc[rec.movie_id] if rec.movie_id in links.index else None
-                movie_card(movie_row, links_row, badge=f"Similarity {rec.score:.2f}")
+                imdb_id = links_row["imdbId"] if links_row is not None else None
+                with st.container(border=True):
+                    movie_card(movie_row, links_row, badge=f"Similarity {rec.score:.2f}", meta=similar_meta.get(imdb_id))

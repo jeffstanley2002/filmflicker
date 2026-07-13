@@ -10,9 +10,10 @@ import streamlit as st
 
 from src import cache, db
 from src.recommenders import clustering
-from src.ui import profile_sidebar, require_profile
+from src.ui import inject_custom_css, profile_sidebar, require_profile
 
 st.set_page_config(page_title="Analytics — CineMatch", page_icon="📊", layout="wide")
+inject_custom_css()
 profile_sidebar()
 profile_id, profile_name = require_profile()
 st.title(f"📊 {profile_name}'s taste profile")
