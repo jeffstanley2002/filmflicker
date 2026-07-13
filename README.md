@@ -86,6 +86,20 @@ every user's top-N, regardless of model).
 - **Storage:** SQLite (profiles/watched/ratings), OMDb response cache
 - **Optional:** OMDb API for real posters (free key), graceful placeholder fallback otherwise
 
+## Testing
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -v
+```
+
+42 tests covering data/feature-engineering logic, the SQLite data layer
+(idempotency, upserts, cross-profile isolation, DB-level constraint
+enforcement), the metric functions, and integration tests against the real
+trained artifacts for all 5 recommenders (exclude-list contracts, score
+ranges, and a direct regression test for the low-signal-movie bug described
+above).
+
 ## Running locally
 
 ```bash
@@ -145,4 +159,5 @@ src/
   recommenders/             One module per model (popularity, content_based, collaborative, clustering, neural)
 app.py                     Home page: intro + profile picker
 pages/                     Browse, Watched, Recommendations, Analytics, Model Comparison
+tests/                     pytest suite (data layer, DB layer, metrics, recommenders)
 ```
