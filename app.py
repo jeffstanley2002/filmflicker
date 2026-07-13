@@ -4,6 +4,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import textwrap
+
 import streamlit as st
 
 from src import cache, db
@@ -14,19 +16,21 @@ inject_custom_css()
 profile_sidebar()
 
 st.markdown(
-    """
-    <div style="padding: 1.75rem 0 0.5rem 0;">
-        <div style="font-size: 2.75rem; font-weight: 800; line-height: 1.1;">
-            🎬 CineMatch
+    textwrap.dedent(
+        """
+        <div style="padding: 1.75rem 0 0.5rem 0;">
+            <div style="font-size: 2.75rem; font-weight: 800; line-height: 1.1;">
+                🎬 CineMatch
+            </div>
+            <div style="font-size: 1.15rem; opacity: 0.8; margin-top: 0.5rem; max-width: 760px;">
+                A movie recommender that runs <b>5 different ML approaches side by side</b>
+                on the MovieLens dataset — popularity ranking, content-based filtering,
+                matrix factorization, clustering, and a neural network — so you can see
+                how each one makes a different call about what you'd like next.
+            </div>
         </div>
-        <div style="font-size: 1.15rem; opacity: 0.8; margin-top: 0.5rem; max-width: 760px;">
-            A movie recommender that runs <b>5 different ML approaches side by side</b>
-            on the MovieLens dataset — popularity ranking, content-based filtering,
-            matrix factorization, clustering, and a neural network — so you can see
-            how each one makes a different call about what you'd like next.
-        </div>
-    </div>
-    """,
+        """
+    ),
     unsafe_allow_html=True,
 )
 

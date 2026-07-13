@@ -18,47 +18,49 @@ def inject_custom_css():
         return
     st.session_state[_CSS_INJECTED_KEY] = True
 
-    st.markdown(
-        """
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-        <style>
-        html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-        /* Poster images: rounded corners + shadow + hover lift */
-        [data-testid="stImage"] img {
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.35);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        [data-testid="stImage"] img:hover {
-            transform: translateY(-4px) scale(1.015);
-            box-shadow: 0 10px 24px rgba(0,0,0,0.5);
-        }
-
-        /* Buttons: smoother corners + hover lift, consistent across the app */
-        .stButton > button {
-            border-radius: 8px;
-            transition: transform 0.12s ease, border-color 0.12s ease;
-        }
-        .stButton > button:hover {
-            transform: translateY(-1px);
-            border-color: #e11d48;
-            color: #e11d48;
-        }
-
-        /* Sidebar + card captions: slightly tighter, calmer typography */
-        [data-testid="stCaptionContainer"] { opacity: 0.75; }
-
-        /* Custom scrollbar */
-        ::-webkit-scrollbar { width: 10px; height: 10px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #3a3f4b; border-radius: 6px; }
-        ::-webkit-scrollbar-thumb:hover { background: #545b6b; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    # No blank lines anywhere in this string, and dedent() strips leading
+    # indentation - both matter. Markdown's raw-HTML-block parsing (since
+    # this doesn't start with <style>/<script>/<pre>, it doesn't get that
+    # tag's "read until the closing tag" treatment) ends the block at the
+    # first blank line OR treats indented text as a code block; either one
+    # causes the back half of the CSS to spill out as literal visible text
+    # instead of being parsed as HTML, which is exactly what happened here
+    # during manual testing before this fix.
+    css = """\
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+/* Poster images: rounded corners + shadow + hover lift */
+[data-testid="stImage"] img {
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+[data-testid="stImage"] img:hover {
+    transform: translateY(-4px) scale(1.015);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.5);
+}
+/* Buttons: smoother corners + hover lift, consistent across the app */
+.stButton > button {
+    border-radius: 8px;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.stButton > button:hover {
+    transform: translateY(-1px);
+    border-color: #e11d48;
+    color: #e11d48;
+}
+/* Sidebar + card captions: slightly tighter, calmer typography */
+[data-testid="stCaptionContainer"] { opacity: 0.75; }
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3a3f4b; border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #545b6b; }
+</style>
+"""
+    st.markdown(css, unsafe_allow_html=True)
 
 
 def require_profile():
