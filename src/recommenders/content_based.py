@@ -46,7 +46,11 @@ def similar_to_movie(movie_id: int, artifacts, n: int = 10, exclude_ids=None) ->
         return []
     idx = idx_map[movie_id]
     sims = cosine_similarity(matrix[idx], matrix).ravel()
-    return _rank(sims, movie_ids, n, exclude_ids or set(), reason_prefix="Similar content/genres")
+    # A movie is trivially "similar" to itself (cosine similarity 1.0, the
+    # max possible) - always exclude the seed regardless of what the caller
+    # passes, rather than relying on every call site to remember to.
+    exclude = set(exclude_ids or set()) | {movie_id}
+    return _rank(sims, movie_ids, n, exclude, reason_prefix="Similar content/genres")
 
 
 def recommend_for_profile(rated: dict, artifacts, n: int = 10, exclude_ids=None) -> list:
