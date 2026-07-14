@@ -1,8 +1,7 @@
 """Loading & feature-engineering helpers for the MovieLens data.
 
-Deliberately free of any Streamlit import so it can be used both by the
-offline training/eval scripts (plain Python) and by the app (wrapped in
-st.cache_data at the call site).
+Deliberately free of frontend or web-framework imports so it can be used by
+the API and by offline training/evaluation scripts.
 """
 import re
 from pathlib import Path
@@ -10,23 +9,42 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "ml-latest-small"
-MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+PROCESSED_DATA_DIR = ROOT_DIR / "data" / "processed"
+DEFAULT_DATA_DIR = ROOT_DIR / "data" / "ml-latest-small"
+DATA_DIR = Path(
+    # Explicit env override is useful for one-off training runs.
+    __import__("os").environ.get(
+        "CINEMATCH_DATA_DIR",
+        str(PROCESSED_DATA_DIR if (PROCESSED_DATA_DIR / "movies.csv").exists() else DEFAULT_DATA_DIR),
+    )
+)
+MODELS_DIR = ROOT_DIR / "models"
 
 _YEAR_RE = re.compile(r"\((\d{4})\)\s*$")
 
 
 def load_movies() -> pd.DataFrame:
     df = pd.read_csv(DATA_DIR / "movies.csv")
-    df["year"] = df["title"].apply(_extract_year)
+    if "year" not in df.columns:
+        df["year"] = df["title"].apply(_extract_year)
+    else:
+        parsed_year = df["title"].apply(_extract_year)
+        df["year"] = pd.to_numeric(df["year"], errors="coerce").fillna(parsed_year)
     df["genre_list"] = df["genres"].apply(
         lambda g: [] if g == "(no genres listed)" else g.split("|")
     )
+    for optional in ["poster_url", "overview", "tmdb_release_date", "metadata_source"]:
+        if optional not in df.columns:
+            df[optional] = None
     return df
 
 
 def load_ratings() -> pd.DataFrame:
-    return pd.read_csv(DATA_DIR / "ratings.csv")
+    return pd.read_csv(
+        DATA_DIR / "ratings.csv",
+        dtype={"userId": np.int32, "movieId": np.int32, "rating": np.float32, "timestamp": np.int64},
+    )
 
 
 def load_tags() -> pd.DataFrame:

@@ -1,0 +1,13 @@
+{
+  "movielens_dir": "data/ml-32m",
+  "movies": 87585,
+  "ratings": 32000204,
+  "tags": 2000072,
+  "min_year": 1874,
+  "max_year": 2023,
+  "tmdb_enabled": false,
+  "tmdb_enriched_movies": 0,
+  "tmdb_current_movies_added": 0,
+  "catalog_freshness": "Catalog refresh recommended before a public launch",
+  "created_at": "2026-07-13T12:50:22Z"
+}

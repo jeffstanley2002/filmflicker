@@ -21,7 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.recommenders.base import MODELS_DIR, Recommendation
+from src.recommenders.base import MODELS_DIR, Recommendation, profile_baseline
 
 ARTIFACT = MODELS_DIR / "neural_weights.npz"
 
@@ -53,7 +53,8 @@ class NeuralRecommender:
         # Mean-centered (not sum-normalized): weights can be negative for
         # disliked movies, and normalizing by their sum would blow up or
         # flip sign when positive/negative ratings nearly cancel out.
-        weights = np.array([r - self.global_mean for r in known.values()], dtype=np.float32)
+        baseline = profile_baseline(known, self.global_mean)
+        weights = np.array([r - baseline for r in known.values()], dtype=np.float32)
         return (item_vecs * weights[:, None]).mean(axis=0)
 
     def predict_for_profile(self, rated: dict, movie_ids) -> np.ndarray:
@@ -62,14 +63,19 @@ class NeuralRecommender:
             return idxs, np.array([], dtype=np.float32)
         user_vec = self.implied_user_vector(rated)
         item_vecs = self._item_tower(idxs)
-        preds = self.global_mean + item_vecs.dot(user_vec) + self.movie_bias[idxs]
+        baseline = profile_baseline(rated, self.global_mean)
+        preds = baseline + item_vecs.dot(user_vec) + self.movie_bias[idxs]
         return idxs, np.clip(preds, 0.5, 5.0)
 
     def recommend_for_profile(self, rated: dict, n: int = 10, exclude_ids=None) -> list:
         exclude = set(exclude_ids or set()) | set(rated.keys())
         candidate_ids = [m for m in self.movie_ids if int(m) not in exclude]
         idxs, preds = self.predict_for_profile(rated, candidate_ids)
-        order = np.argsort(-preds)
+        pool_size = min(len(preds), max(n * 8, n))
+        if pool_size == 0:
+            return []
+        pool = np.argpartition(-preds, pool_size - 1)[:pool_size]
+        order = pool[np.argsort(-preds[pool])]
         out = []
         for o in order[: n]:
             mid = int(self.movie_ids[idxs[o]])
@@ -77,7 +83,7 @@ class NeuralRecommender:
                 Recommendation(
                     movie_id=mid,
                     score=float(preds[o]),
-                    reason=f"Neural net predicts {preds[o]:.1f}★ for you",
+                    reason=f"Embedding model predicts {preds[o]:.1f}★ for you",
                     model="neural",
                 )
             )

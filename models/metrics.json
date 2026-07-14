@@ -1,37 +1,74 @@
 {
+  "generated_at": "2026-07-14T06:57:05.589566+00:00",
+  "data_dir": "/Users/jeffrey/Desktop/proj/data/processed",
   "k": 10,
-  "n_eval_users": 150,
+  "n_eval_users": 250,
+  "original_rating_count": 32000204,
+  "evaluated_rating_count": 999874,
+  "train_rating_count": 968259,
+  "test_rating_count": 31615,
+  "rating_prediction_sample_size": 31615,
   "rating_prediction": {
     "collaborative": {
-      "rmse": 0.9930048988646473,
-      "mae": 0.7653515005270014
+      "rmse": 0.9089210881205324,
+      "mae": 0.6820277090465788
     },
     "neural": {
-      "rmse": 1.1164881377546951,
-      "mae": 0.8370266452753562
+      "rmse": 0.9293223728435239,
+      "mae": 0.6974076816206228
     }
   },
   "top_n": {
     "popularity": {
-      "precision_at_10": 0.025333333333333333,
-      "recall_at_10": 0.019414594458485746
+      "precision_at_10": 0.0156,
+      "recall_at_10": 0.04233333333333333,
+      "hit_rate_at_10": 0.132,
+      "ndcg_at_10": 0.027623357513503196,
+      "mrr_at_10": 0.03955238095238096,
+      "intra_list_diversity": 0.7127891890825224,
+      "mean_novelty_bits": 12.725103953667844,
+      "catalog_coverage": 0.004429982302905749
     },
     "content_based": {
-      "precision_at_10": 0.010666666666666668,
-      "recall_at_10": 0.00644609012396423
+      "precision_at_10": 0.0176,
+      "recall_at_10": 0.046933333333333334,
+      "hit_rate_at_10": 0.148,
+      "ndcg_at_10": 0.03667957481377202,
+      "mrr_at_10": 0.05943174603174603,
+      "intra_list_diversity": 0.7133790118523452,
+      "mean_novelty_bits": 12.62263712536207,
+      "catalog_coverage": 0.005777244962036878
     },
     "collaborative": {
-      "precision_at_10": 0.09466666666666666,
-      "recall_at_10": 0.06804808501213575
+      "precision_at_10": 0.019600000000000003,
+      "recall_at_10": 0.056,
+      "hit_rate_at_10": 0.176,
+      "ndcg_at_10": 0.0406165569750093,
+      "mrr_at_10": 0.06386984126984127,
+      "intra_list_diversity": 0.8158199483232816,
+      "mean_novelty_bits": 11.695750406114476,
+      "catalog_coverage": 0.003356739167665696
     },
     "clustering": {
-      "precision_at_10": 0.046,
-      "recall_at_10": 0.04291280496500405
+      "precision_at_10": 0.0124,
+      "recall_at_10": 0.034466666666666666,
+      "hit_rate_at_10": 0.104,
+      "ndcg_at_10": 0.02783801533075442,
+      "mrr_at_10": 0.04644285714285715,
+      "intra_list_diversity": 0.6729036547403213,
+      "mean_novelty_bits": 12.988466936493456,
+      "catalog_coverage": 0.0033339042073414395
     },
     "neural": {
-      "precision_at_10": 0.012666666666666668,
-      "recall_at_10": 0.012890777902817844
+      "precision_at_10": 0.0164,
+      "recall_at_10": 0.043666666666666666,
+      "hit_rate_at_10": 0.136,
+      "ndcg_at_10": 0.03232040695181737,
+      "mrr_at_10": 0.05161269841269841,
+      "intra_list_diversity": 0.8120252870586204,
+      "mean_novelty_bits": 11.765673617247717,
+      "catalog_coverage": 0.003448079008962722
     }
   },
-  "notes": "80/20 random split of ratings.csv. Collaborative/clustering/neural retrained on the train split only; content-based and popularity use rating-weighted profiles built from each test user's train-split ratings only. New/cold profiles fall back to popularity - not reflected in these per-user metrics."
+  "notes": "Per-user temporal holdout of the latest interactions. Evaluation samples complete user histories. Collaborative, clustering, and latent taste embedding artifacts are retrained on the train split only; content-based and popularity use rating-weighted profiles built from each test user's train-split ratings only. New or cold profiles fall back to popularity."
 }

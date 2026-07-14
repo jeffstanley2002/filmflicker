@@ -1,4 +1,4 @@
-"""Offline training pipeline for all 5 recommenders.
+"""Offline training pipeline for all recommenders.
 
 Run once (or whenever the data changes):
     source .venv/bin/activate
@@ -10,6 +10,7 @@ artifacts - see requirements.txt (no TensorFlow) vs requirements-train.txt.
 """
 import sys
 import time
+import argparse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -23,6 +24,13 @@ EMBED_DIM = 16
 LATENT_DIM = 16  # shared space the two towers project into for the dot product
 EPOCHS = 8
 BATCH_SIZE = 256
+DEFAULT_NEURAL_SAMPLE_SIZE = 1_000_000
+
+
+def _sample_ratings(ratings, max_rows: int | None, seed: int = 42):
+    if not max_rows or len(ratings) <= max_rows:
+        return ratings
+    return ratings.sample(n=max_rows, random_state=seed).reset_index(drop=True)
 
 
 def build_and_train_neural(movies, ratings, epochs: int = EPOCHS) -> dict:
@@ -130,13 +138,58 @@ def build_and_train_neural(movies, ratings, epochs: int = EPOCHS) -> dict:
     }
 
 
-def train_neural(movies, ratings):
-    weights = build_and_train_neural(movies, ratings)
+def build_embedding_fallback_weights(collab_artifacts: dict, ratings) -> dict:
+    """Build a serve-compatible embedding model without TensorFlow.
+
+    The deployed numpy recommender expects an item-tower artifact. When the
+    local training environment does not have TensorFlow, we export a pure
+    embedding model from the collaborative SVD item factors. It keeps the same
+    serving contract and produces personalized fold-in recommendations, while
+    metrics.json records that this artifact was built from SVD factors.
+    """
+    movie_ids = collab_artifacts["movie_ids"]
+    item_factors = collab_artifacts["item_factors"].astype(np.float32)
+    norms = np.linalg.norm(item_factors, axis=1, keepdims=True)
+    item_unit = item_factors / np.maximum(norms, 1e-6)
+
+    movie_emb = np.hstack([np.maximum(item_unit, 0), np.maximum(-item_unit, 0)]).astype(np.float32)
+    movie_stats = ratings.groupby("movieId")["rating"].agg(["count", "mean"]).reindex(movie_ids)
+    global_mean = float(ratings["rating"].mean())
+    counts = movie_stats["count"].fillna(0).to_numpy(dtype=np.float32)
+    means = movie_stats["mean"].fillna(global_mean).to_numpy(dtype=np.float32)
+    movie_bias = ((means - global_mean) * (counts / (counts + 25.0))).astype(np.float32)
+
+    return {
+        "movie_emb": movie_emb,
+        "movie_bias": movie_bias,
+        "genre_matrix": np.zeros((len(movie_ids), 0), dtype=np.float32),
+        "Wi": np.eye(movie_emb.shape[1], dtype=np.float32),
+        "bi": np.zeros(movie_emb.shape[1], dtype=np.float32),
+        "global_mean": np.float32(global_mean),
+        "movie_ids": movie_ids,
+        "training_mode": np.array("svd_embedding_fallback"),
+    }
+
+
+def train_neural(movies, ratings, collab_artifacts: dict, mode: str, sample_size: int | None):
+    if mode == "tensorflow":
+        train_ratings = _sample_ratings(ratings, sample_size)
+        if len(train_ratings) < len(ratings):
+            print(f"Training TensorFlow neural model on a {len(train_ratings):,}-rating sample.")
+        weights = build_and_train_neural(movies, train_ratings)
+    else:
+        print("Exporting latent taste embedding artifact from trained SVD factors.")
+        weights = build_embedding_fallback_weights(collab_artifacts, ratings)
     neural.save_weights(weights)
     print("Saved neural model weights ->", neural.ARTIFACT)
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--neural-mode", choices=["embedding", "tensorflow"], default="embedding")
+    parser.add_argument("--neural-sample-size", type=int, default=DEFAULT_NEURAL_SAMPLE_SIZE)
+    args = parser.parse_args()
+
     t0 = time.time()
     print("Loading data...")
     movies = data_utils.load_movies()
@@ -150,13 +203,13 @@ def main():
     content_based.train_and_save(movies, tags)
 
     print("Training collaborative SVD...")
-    collaborative.train_and_save(ratings)
+    collab_artifacts = collaborative.train_and_save(ratings)
 
     print("Training KMeans clustering...")
     clustering.train_and_save(movies, ratings)
 
-    print("Training neural embedding model (TensorFlow, offline only)...")
-    train_neural(movies, ratings)
+    print("Training/exporting latent taste embedding model...")
+    train_neural(movies, ratings, collab_artifacts, args.neural_mode, args.neural_sample_size)
 
     print(f"All models trained in {time.time() - t0:.1f}s. Artifacts in models/.")
 

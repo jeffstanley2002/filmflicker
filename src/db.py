@@ -1,19 +1,8 @@
-"""Storage for user profiles, watched movies, and ratings - SQLite locally,
-Postgres (e.g. a free Supabase project) once deployed for real users, via
-SQLAlchemy Core (create_engine + text(), not the ORM).
+"""Legacy local profile storage kept for tests and offline experiments.
 
-Deliberately password-free: profiles are just named buckets so a single
-deployed demo can support several "users" without any auth machinery.
-
-Backend selection, in order: an explicit `database_url` argument (used by
-tests for per-test isolation) -> the `DATABASE_URL` secret/env var -> a
-local SQLite file under app_data/. Local development needs zero setup -
-only once a real DATABASE_URL is configured (e.g. on Streamlit Cloud) does
-the app switch to Postgres. See README's "Setting up Postgres" section.
-
-Every public function keeps its original name/signature from the earlier
-sqlite3-only implementation, so no call site outside this module needed to
-change - `engine` plays the same role `conn` used to.
+The production React application uses `backend/db.py`, Supabase Auth, and
+the `cinematch_v2` schema. This module remains dependency-light and reads
+configuration from ordinary environment variables only.
 """
 import os
 from pathlib import Path
@@ -74,19 +63,6 @@ CREATE TABLE IF NOT EXISTS ratings (
 
 
 def _resolve_database_url() -> str:
-    secrets_paths = [
-        Path(__file__).resolve().parent.parent / ".streamlit" / "secrets.toml",
-        Path.home() / ".streamlit" / "secrets.toml",
-    ]
-    if any(p.exists() for p in secrets_paths):
-        try:
-            import streamlit as st
-
-            url = st.secrets.get("DATABASE_URL")
-            if url:
-                return url
-        except Exception:
-            pass
     env_url = os.environ.get("DATABASE_URL")
     if env_url:
         return env_url
