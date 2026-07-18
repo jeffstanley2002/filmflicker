@@ -3,6 +3,7 @@ import { ArrowRight, Clapperboard, Film, Lock, Mail, Play, Sparkles, Star } from
 import { Link, Navigate } from "react-router-dom";
 import { BackButton } from "../components/BackButton";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
+import { errorMessage } from "../lib/errors";
 import type { Session } from "@supabase/supabase-js";
 
 export function AuthPage({ session }: { session: Session | null }) {
@@ -22,17 +23,22 @@ export function AuthPage({ session }: { session: Session | null }) {
     }
     setLoading(true);
     setMessage(null);
-    const result =
-      mode === "login"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
-    setLoading(false);
-    if (result.error) {
-      setMessage(result.error.message);
-      return;
-    }
-    if (mode === "register" && !result.data.session) {
-      setMessage("Registration created. Check your email if confirmation is enabled in Supabase.");
+    try {
+      const result =
+        mode === "login"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({ email, password });
+      if (result.error) {
+        setMessage(result.error.message);
+        return;
+      }
+      if (mode === "register" && !result.data.session) {
+        setMessage("Registration created. Check your email if confirmation is enabled in Supabase.");
+      }
+    } catch (error) {
+      setMessage(errorMessage(error, "Authentication is temporarily unavailable."));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -43,14 +49,17 @@ export function AuthPage({ session }: { session: Session | null }) {
     }
     setLoading(true);
     setMessage(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/app/browse`,
-      },
-    });
-    if (error) {
-      setMessage(error.message);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/app/browse`,
+        },
+      });
+      if (error) setMessage(error.message);
+    } catch (error) {
+      setMessage(errorMessage(error, "Google sign-in is temporarily unavailable."));
+    } finally {
       setLoading(false);
     }
   }

@@ -30,6 +30,7 @@ class Recommendation:
     score: float
     reason: str = ""
     model: str = ""
+    source_model: str | None = None
 
 
 @dataclass

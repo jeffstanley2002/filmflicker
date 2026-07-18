@@ -7,9 +7,9 @@ generalization, then reports:
   - Precision@K / Recall@K for all five models' top-N lists, evaluated
     against each sampled test user's held-out "liked" movies (rating >= 4)
 
-Results are written to models/metrics.json for the app's Model Comparison
-page. Requires TensorFlow (see requirements-train.txt) - this script is a
-dev-time tool, not part of the deployed app.
+Results are written to models/metrics.json for the app's model metrics page.
+The default embedding evaluation is NumPy-only; TensorFlow is needed only
+when explicitly training the optional two-tower neural variant.
 
 Run: python scripts/evaluate_models.py
 """
@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 
 from src import data_utils, evaluate
+from src.artifacts import atomic_write_text, write_manifest
 from src.recommenders import clustering, collaborative, content_based, ensemble, neural, popularity
 from src.recommenders.base import low_signal_movie_ids, profile_baseline
 from train_models import build_embedding_fallback_weights
@@ -37,6 +38,24 @@ MIN_TRAIN_RATINGS = 5
 SEED = 42
 DEFAULT_MAX_RATINGS = 2_000_000
 DEFAULT_MAX_RATING_PREDICTIONS = 200_000
+BASELINE_RANKING_CONFIG = {
+    "personalized_weight": 0.72,
+    "quality_weight": 0.23,
+    "novelty_weight": 0.05,
+    "diversity_strength": 0.16,
+}
+
+
+def confidence_interval(values: list[float], *, bounded: bool = False) -> list[float]:
+    """Normal-approximation 95% CI over per-user metrics."""
+    sample = np.asarray(values, dtype=np.float64)
+    if len(sample) < 2:
+        mean = float(sample.mean()) if len(sample) else 0.0
+        return [mean, mean]
+    mean = float(sample.mean())
+    margin = 1.96 * float(sample.std(ddof=1)) / np.sqrt(len(sample))
+    interval = [mean - margin, mean + margin]
+    return [max(0.0, interval[0]), min(1.0, interval[1])] if bounded else interval
 
 
 def main():
@@ -71,6 +90,14 @@ def main():
     collab_artifacts = collaborative.train_and_save(
         train_ratings, out_path=MODELS_DIR / "_eval_svd.joblib"
     )
+    print("Training previous collaborative configuration for a paired baseline...")
+    baseline_collab = collaborative.train_and_save(
+        train_ratings,
+        out_path=MODELS_DIR / "_eval_baseline_svd.joblib",
+        n_components=32,
+        fold_in_regularization=0.35,
+        profile_baseline_strength=5.0,
+    )
 
     print("Retraining KMeans clustering on train split...")
     cluster_artifacts = clustering.train_and_save(
@@ -89,7 +116,7 @@ def main():
     # --- RMSE / MAE for rating-predicting models ---
     print("Scoring RMSE/MAE...")
     global_mean_train = float(train_ratings["rating"].mean())
-    collab_preds, neural_preds, actuals = [], [], []
+    collab_preds, baseline_collab_preds, neural_preds, actuals = [], [], [], []
     rating_test = test_ratings
     if args.max_rating_predictions and len(rating_test) > args.max_rating_predictions:
         rating_test = rating_test.sample(n=args.max_rating_predictions, random_state=SEED).reset_index(drop=True)
@@ -97,6 +124,7 @@ def main():
         int(m): i for i, m in enumerate(collab_artifacts["movie_ids"])
     }
     collab_user_vec_cache: dict[int, np.ndarray] = {}
+    baseline_user_vec_cache: dict[int, np.ndarray] = {}
     neural_user_vec_cache: dict[int, np.ndarray] = {}
     for row in rating_test.itertuples():
         uid = int(row.userId)
@@ -109,7 +137,11 @@ def main():
         else:
             movie_bias = collab_artifacts.get("movie_bias")
             bias = movie_bias[movie_idx] if movie_bias is not None else 0
-            baseline = profile_baseline(train_dict, float(collab_artifacts["global_mean"]))
+            baseline = profile_baseline(
+                train_dict,
+                float(collab_artifacts["global_mean"]),
+                strength=float(collab_artifacts.get("profile_baseline_strength", 5.0)),
+            )
             score = baseline + collab_artifacts["item_factors"][movie_idx].dot(collab_user_vec_cache[uid]) + bias
             collab_preds.append(float(np.clip(score, 0.5, 5.0)))
 
@@ -120,14 +152,38 @@ def main():
             neural_preds.append(global_mean_train)
         else:
             item_vec = neural_model._item_tower(np.array([neural_idx], dtype=np.int64))[0]
-            baseline = profile_baseline(train_dict, neural_model.global_mean)
+            baseline = profile_baseline(
+                train_dict,
+                neural_model.global_mean,
+                strength=neural_model.profile_baseline_strength,
+            )
             score = baseline + item_vec.dot(neural_user_vec_cache[uid]) + neural_model.movie_bias[neural_idx]
             neural_preds.append(float(np.clip(score, 0.5, 5.0)))
         actuals.append(row.rating)
+        if uid not in baseline_user_vec_cache:
+            baseline_user_vec_cache[uid] = collaborative.fold_in_new_profile(train_dict, baseline_collab)
+        baseline_idx = baseline_collab["movie_idx"].get(int(row.movieId))
+        if baseline_idx is None:
+            baseline_collab_preds.append(global_mean_train)
+        else:
+            baseline_value = (
+                profile_baseline(
+                    train_dict,
+                    float(baseline_collab["global_mean"]),
+                    strength=float(baseline_collab["profile_baseline_strength"]),
+                )
+                + baseline_collab["item_factors"][baseline_idx].dot(baseline_user_vec_cache[uid])
+                + baseline_collab["movie_bias"][baseline_idx]
+            )
+            baseline_collab_preds.append(float(np.clip(baseline_value, 0.5, 5.0)))
 
     rating_metrics = {
         "collaborative": {"rmse": evaluate.rmse(collab_preds, actuals), "mae": evaluate.mae(collab_preds, actuals)},
         "neural": {"rmse": evaluate.rmse(neural_preds, actuals), "mae": evaluate.mae(neural_preds, actuals)},
+    }
+    baseline_rating_metrics = {
+        "rmse": evaluate.rmse(baseline_collab_preds, actuals),
+        "mae": evaluate.mae(baseline_collab_preds, actuals),
     }
 
     # --- Precision@K / Recall@K for all 5 models ---
@@ -142,6 +198,8 @@ def main():
     topn_scores = {m: {"precision": [], "recall": [], "hit_rate": [], "ndcg": [], "mrr": [], "diversity": [], "novelty": []} for m in
                    ["popularity", "content_based", "collaborative", "clustering", "neural"]}
     coverage_ids = {m: set() for m in topn_scores}
+    baseline_scores = {name: [] for name in ("precision", "recall", "hit_rate", "ndcg")}
+    paired_deltas = {name: [] for name in baseline_scores}
     genres_by_movie = {
         int(row.movieId): set(row.genre_list) for row in movies[["movieId", "genre_list"]].itertuples(index=False)
     }
@@ -177,6 +235,28 @@ def main():
             )
             for model_name in topn_scores
         }
+        baseline_recs = ensemble.recommend(
+            model="collaborative",
+            n=args.k,
+            rated=train_dict,
+            watched_ids=watched,
+            disliked_ids=set(),
+            movies_df=indexed_movies,
+            pop_df=pop_df,
+            low_signal=low_signal,
+            artifacts={**ensemble_artifacts, "collaborative": baseline_collab},
+            ranking_config=BASELINE_RANKING_CONFIG,
+        )
+        baseline_ids = [rec.movie_id for rec in baseline_recs]
+        baseline_p, baseline_r = evaluate.precision_recall_at_k(baseline_ids, relevant, args.k)
+        baseline_values = {
+            "precision": baseline_p,
+            "recall": baseline_r,
+            "hit_rate": evaluate.hit_rate_at_k(baseline_ids, relevant, args.k),
+            "ndcg": evaluate.ndcg_at_k(baseline_ids, relevant, args.k),
+        }
+        for name, value in baseline_values.items():
+            baseline_scores[name].append(value)
         for model_name, rec_list in recs.items():
             rec_ids = [r.movie_id for r in rec_list]
             coverage_ids[model_name].update(rec_ids)
@@ -192,6 +272,10 @@ def main():
                 for mid in rec_ids
             ]
             topn_scores[model_name]["novelty"].append(float(np.mean(novelty)) if novelty else 0.0)
+            if model_name == "collaborative":
+                tuned_values = {"precision": p, "recall": r, "hit_rate": topn_scores[model_name]["hit_rate"][-1], "ndcg": topn_scores[model_name]["ndcg"][-1]}
+                for name in paired_deltas:
+                    paired_deltas[name].append(tuned_values[name] - baseline_values[name])
 
     topn_metrics = {
         m: {
@@ -203,6 +287,10 @@ def main():
             "intra_list_diversity": float(np.mean(v["diversity"])) if v["diversity"] else 0.0,
             "mean_novelty_bits": float(np.mean(v["novelty"])) if v["novelty"] else 0.0,
             "catalog_coverage": float(len(coverage_ids[m]) / max(len(movies), 1)),
+            "confidence_intervals_95": {
+                f"{name}_at_{args.k}": confidence_interval(v[name], bounded=True)
+                for name in ("precision", "recall", "hit_rate", "ndcg")
+            },
         }
         for m, v in topn_scores.items()
     }
@@ -219,6 +307,27 @@ def main():
         "rating_prediction_sample_size": int(len(rating_test)),
         "rating_prediction": rating_metrics,
         "top_n": topn_metrics,
+        "baseline_comparison": {
+            "description": "Paired same-user comparison against the previous 32-factor collaborative and reranking configuration.",
+            "previous_config": {
+                "components": 32,
+                "fold_in_regularization": 0.35,
+                "profile_baseline_strength": 5.0,
+                "ranking": BASELINE_RANKING_CONFIG,
+            },
+            "rating_prediction": baseline_rating_metrics,
+            "top_n": {
+                f"{name}_at_{args.k}": float(np.mean(values)) if values else 0.0
+                for name, values in baseline_scores.items()
+            },
+            "paired_delta_tuned_minus_previous": {
+                f"{name}_at_{args.k}": {
+                    "mean": float(np.mean(values)) if values else 0.0,
+                    "confidence_interval_95": confidence_interval(values),
+                }
+                for name, values in paired_deltas.items()
+            },
+        },
         "notes": (
             "Per-user temporal holdout of the latest interactions. Evaluation samples complete user histories. "
             "Collaborative, clustering, and latent taste embedding artifacts are retrained on the train split only; "
@@ -229,10 +338,12 @@ def main():
 
     out_path = args.output
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(metrics, indent=2))
+    atomic_write_text(out_path, json.dumps(metrics, indent=2) + "\n")
+    if out_path.resolve() == (MODELS_DIR / "metrics.json").resolve():
+        write_manifest()
     print(f"Wrote {out_path}")
 
-    for p in ["_eval_svd.joblib", "_eval_clustering.joblib", "_eval_popularity.csv"]:
+    for p in ["_eval_svd.joblib", "_eval_baseline_svd.joblib", "_eval_clustering.joblib", "_eval_popularity.csv"]:
         fp = MODELS_DIR / p
         if fp.exists():
             fp.unlink()

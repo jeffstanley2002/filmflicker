@@ -21,6 +21,7 @@ def recommend(
     pop_df,
     low_signal: set,
     artifacts: dict,
+    ranking_config: dict | None = None,
 ):
     exclude = set(watched_ids) | set(disliked_ids) | set(low_signal)
     preferences = dict(rated)
@@ -68,4 +69,11 @@ def recommend(
 
     if not candidates:
         candidates = popularity.top_trending(pop_df, n=pool_n, exclude_ids=exclude)
-    return ranking.rerank_candidates(candidates, movies_df, pop_df, n=n, primary_model=model)
+    return ranking.rerank_candidates(
+        candidates,
+        movies_df,
+        pop_df,
+        n=n,
+        primary_model=model,
+        config=ranking_config,
+    )

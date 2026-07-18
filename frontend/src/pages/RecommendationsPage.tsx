@@ -6,12 +6,13 @@ import { ModelSelector } from "../components/ModelSelector";
 import { MovieCard } from "../components/MovieCard";
 import { MODEL_COPY } from "../lib/models";
 import { getRecommendations, setNotInterested, setWatched } from "../lib/api";
+import { errorMessage } from "../lib/errors";
 import { useAsync } from "../lib/useAsync";
 import type { ModelKey, Recommendation } from "../lib/types";
 
 export function RecommendationsPage({ token }: { token: string }) {
   const [model, setModel] = useState<ModelKey>("collaborative");
-  const { data, loading, error, setData } = useAsync(() => getRecommendations(token, model, 12), [token, model]);
+  const { data, loading, error, setData } = useAsync((signal) => getRecommendations(token, model, 12, signal), [token, model]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   async function markWatched(movie: Recommendation) {
@@ -21,7 +22,7 @@ export function RecommendationsPage({ token }: { token: string }) {
       await setWatched(token, movie.movie_id, true);
       setData((current) => current?.filter((item) => item.movie_id !== movie.movie_id) ?? null);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to save movie");
+      setActionError(errorMessage(err, "Unable to save movie"));
     } finally {
       setBusyId(null);
     }
@@ -34,7 +35,7 @@ export function RecommendationsPage({ token }: { token: string }) {
       await setNotInterested(token, movie.movie_id);
       setData((current) => current?.filter((item) => item.movie_id !== movie.movie_id) ?? null);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to update your taste feedback");
+      setActionError(errorMessage(err, "Unable to update your taste feedback"));
     } finally {
       setBusyId(null);
     }

@@ -11,6 +11,8 @@ artifacts - see requirements.txt (no TensorFlow) vs requirements-train.txt.
 import sys
 import time
 import argparse
+import tempfile
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -18,6 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import numpy as np
 
 from src import data_utils
+from src.artifacts import atomic_replace, write_manifest
+from src.recommenders.base import MODELS_DIR
 from src.recommenders import clustering, collaborative, content_based, neural, popularity
 
 EMBED_DIM = 16
@@ -168,10 +172,13 @@ def build_embedding_fallback_weights(collab_artifacts: dict, ratings) -> dict:
         "global_mean": np.float32(global_mean),
         "movie_ids": movie_ids,
         "training_mode": np.array("svd_embedding_fallback"),
+        "profile_baseline_strength": np.float32(
+            collab_artifacts.get("profile_baseline_strength", collaborative.PROFILE_BASELINE_STRENGTH)
+        ),
     }
 
 
-def train_neural(movies, ratings, collab_artifacts: dict, mode: str, sample_size: int | None):
+def train_neural(movies, ratings, collab_artifacts: dict, mode: str, sample_size: int | None, out_path=None):
     if mode == "tensorflow":
         train_ratings = _sample_ratings(ratings, sample_size)
         if len(train_ratings) < len(ratings):
@@ -180,8 +187,9 @@ def train_neural(movies, ratings, collab_artifacts: dict, mode: str, sample_size
     else:
         print("Exporting latent taste embedding artifact from trained SVD factors.")
         weights = build_embedding_fallback_weights(collab_artifacts, ratings)
-    neural.save_weights(weights)
-    print("Saved neural model weights ->", neural.ARTIFACT)
+    output = out_path or neural.ARTIFACT
+    neural.save_weights(weights, output)
+    print("Saved neural model weights ->", output)
 
 
 def main():
@@ -196,20 +204,48 @@ def main():
     ratings = data_utils.load_ratings()
     tags = data_utils.load_tags()
 
-    print("Training popularity table...")
-    popularity.train_and_save(movies, ratings)
+    generation_id = str(uuid.uuid4())
+    with tempfile.TemporaryDirectory(prefix="cinematch-models-", dir=MODELS_DIR.parent) as temporary:
+        staging = Path(temporary)
+        print("Training popularity table...")
+        popularity.train_and_save(movies, ratings, staging / popularity.ARTIFACT.name)
 
-    print("Training content-based TF-IDF...")
-    content_based.train_and_save(movies, tags)
+        print("Training content-based TF-IDF...")
+        content_based.train_and_save(movies, tags, staging)
 
-    print("Training collaborative SVD...")
-    collab_artifacts = collaborative.train_and_save(ratings)
+        print("Training collaborative SVD...")
+        collab_artifacts = collaborative.train_and_save(
+            ratings, out_path=staging / collaborative.ARTIFACT.name
+        )
 
-    print("Training KMeans clustering...")
-    clustering.train_and_save(movies, ratings)
+        print("Training KMeans clustering...")
+        clustering.train_and_save(movies, ratings, staging / clustering.ARTIFACT.name)
 
-    print("Training/exporting latent taste embedding model...")
-    train_neural(movies, ratings, collab_artifacts, args.neural_mode, args.neural_sample_size)
+        print("Training/exporting latent taste embedding model...")
+        train_neural(
+            movies,
+            ratings,
+            collab_artifacts,
+            args.neural_mode,
+            args.neural_sample_size,
+            staging / neural.ARTIFACT.name,
+        )
+
+        for path in staging.iterdir():
+            atomic_replace(path, MODELS_DIR / path.name)
+
+    metrics_path = MODELS_DIR / "metrics.json"
+    if metrics_path.exists():
+        metrics_path.unlink()
+    write_manifest(
+        generation_id=generation_id,
+        config={
+            "collaborative_components": collaborative.N_COMPONENTS,
+            "fold_in_regularization": collaborative.FOLD_IN_REGULARIZATION,
+            "profile_baseline_strength": collaborative.PROFILE_BASELINE_STRENGTH,
+            "neural_mode": args.neural_mode,
+        },
+    )
 
     print(f"All models trained in {time.time() - t0:.1f}s. Artifacts in models/.")
 

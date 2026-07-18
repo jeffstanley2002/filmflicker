@@ -1,26 +1,53 @@
 import type { Analytics, ModelKey, MoviePage, Recommendation, SystemMetrics } from "./types";
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
+const configuredApiUrl = import.meta.env.VITE_API_URL as string | undefined;
+const API_URL = (configuredApiUrl ?? (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
+
+function apiUrl() {
+  if (!API_URL) throw new Error("VITE_API_URL is required in production.");
+  return API_URL;
+}
 
 type ApiOptions = RequestInit & { token?: string | null };
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+  if (options.body != null) headers.set("Content-Type", "application/json");
   if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
 
-  const response = await fetch(`${API_URL}${path}`, { ...options, headers });
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const body = (await response.json()) as { detail?: string };
-      message = body.detail ?? message;
-    } catch {
-      // Keep the HTTP status message.
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(new DOMException("Request timed out", "TimeoutError")), 15_000);
+  const abort = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) abort();
+  else options.signal?.addEventListener("abort", abort, { once: true });
+  const fetchOptions: ApiOptions = { ...options };
+  delete fetchOptions.token;
+  delete fetchOptions.signal;
+  try {
+    const response = await fetch(`${apiUrl()}${path}`, { ...fetchOptions, headers, signal: controller.signal });
+    if (!response.ok) {
+      let message = `${response.status} ${response.statusText}`;
+      try {
+        const body = (await response.json()) as { detail?: string };
+        message = body.detail ?? message;
+      } catch {
+        // Keep the HTTP status message.
+      }
+      if (response.status === 401) window.dispatchEvent(new Event("cinematch:unauthorized"));
+      throw new ApiError(message, response.status);
     }
-    throw new Error(message);
+    return response.json() as Promise<T>;
+  } finally {
+    window.clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abort);
   }
-  return response.json() as Promise<T>;
 }
 
 export function getSystemMetrics() {
@@ -37,7 +64,7 @@ export function getMovies(token: string, params: URLSearchParams, signal?: Abort
 
 export function resolveAssetUrl(url: string | null) {
   if (!url) return null;
-  return url.startsWith("/") ? `${API_URL}${url}` : url;
+  return url.startsWith("/") ? `${apiUrl()}${url}` : url;
 }
 
 export function setWatched(token: string, movieId: number, watched: boolean) {
@@ -63,18 +90,18 @@ export function setNotInterested(token: string, movieId: number) {
   });
 }
 
-export function getWatched(token: string) {
-  return request<MoviePage["results"]>("/watched", { token });
+export function getWatched(token: string, page = 1, signal?: AbortSignal) {
+  return request<MoviePage>(`/watched?page=${page}&page_size=24`, { token, signal });
 }
 
-export function getRecommendations(token: string, model: ModelKey, n = 12) {
-  return request<Recommendation[]>(`/recommendations?model=${model}&n=${n}`, { token });
+export function getRecommendations(token: string, model: ModelKey, n = 12, signal?: AbortSignal) {
+  return request<Recommendation[]>(`/recommendations?model=${model}&n=${n}`, { token, signal });
 }
 
 export function getSimilar(token: string, movieId: number, n = 8) {
   return request<Recommendation[]>(`/recommendations/similar/${movieId}?n=${n}`, { token });
 }
 
-export function getAnalytics(token: string) {
-  return request<Analytics>("/analytics", { token });
+export function getAnalytics(token: string, signal?: AbortSignal) {
+  return request<Analytics>("/analytics", { token, signal });
 }

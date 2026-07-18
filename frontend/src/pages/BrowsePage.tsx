@@ -5,6 +5,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Loading } from "../components/Loading";
 import { MovieCard } from "../components/MovieCard";
 import { getGenres, getMovies, setRating, setWatched } from "../lib/api";
+import { errorMessage } from "../lib/errors";
 import type { Movie, MoviePage } from "../lib/types";
 
 export function BrowsePage({ token }: { token: string }) {
@@ -54,7 +55,7 @@ export function BrowsePage({ token }: { token: string }) {
       })
       .catch((err: unknown) => {
         if (!cancelled && !(err instanceof DOMException && err.name === "AbortError")) {
-          setError(err instanceof Error ? err.message : "Unable to load movies");
+          setError(errorMessage(err, "Unable to load movies"));
         }
       })
       .finally(() => {
@@ -81,7 +82,7 @@ export function BrowsePage({ token }: { token: string }) {
       await setWatched(token, movie.movie_id, watched);
       await updateMovie(movie, { watched, user_rating: watched ? movie.user_rating : null });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update watched state");
+      setError(errorMessage(err, "Unable to update watched state"));
     } finally {
       setBusyId(null);
     }
@@ -94,7 +95,7 @@ export function BrowsePage({ token }: { token: string }) {
       await setRating(token, movie.movie_id, rating);
       await updateMovie(movie, { watched: true, user_rating: rating });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save rating");
+      setError(errorMessage(err, "Unable to save rating"));
     } finally {
       setBusyId(null);
     }

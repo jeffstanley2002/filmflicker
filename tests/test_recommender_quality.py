@@ -37,3 +37,36 @@ def test_reranker_deduplicates_candidates_and_preserves_primary_model():
     assert len(results) == 3
     assert len({result.movie_id for result in results}) == 3
     assert all(result.model == "collaborative" for result in results)
+
+
+def test_reranker_accepts_normalized_weight_configuration():
+    movies = pd.DataFrame(
+        {"movieId": [1, 2], "genre_list": [["Action"], ["Drama"]]}
+    ).set_index("movieId", drop=False)
+    popularity = pd.DataFrame(
+        {"movieId": [1, 2], "weighted_score": [3.0, 5.0], "count": [10, 1000]}
+    )
+    candidates = [
+        Recommendation(1, 5.0, "personal", "collaborative"),
+        Recommendation(2, 4.0, "quality", "collaborative"),
+    ]
+
+    personalized = rerank_candidates(
+        candidates,
+        movies,
+        popularity,
+        n=2,
+        primary_model="collaborative",
+        config={"personalized_weight": 1.0, "quality_weight": 0.0, "novelty_weight": 0.0},
+    )
+    quality = rerank_candidates(
+        candidates,
+        movies,
+        popularity,
+        n=2,
+        primary_model="collaborative",
+        config={"personalized_weight": 0.0, "quality_weight": 1.0, "novelty_weight": 0.0},
+    )
+
+    assert personalized[0].movie_id == 1
+    assert quality[0].movie_id == 2

@@ -6,36 +6,9 @@ and uses Supabase Auth user IDs as the tenant boundary for every query.
 import os
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, bindparam, create_engine, text
 
-_SCHEMA_DDL = """
-CREATE SCHEMA IF NOT EXISTS cinematch_v2;
-
-CREATE TABLE IF NOT EXISTS cinematch_v2.watched (
-    id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    movie_id INTEGER NOT NULL,
-    watched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(user_id, movie_id)
-);
-
-CREATE TABLE IF NOT EXISTS cinematch_v2.ratings (
-    id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    movie_id INTEGER NOT NULL,
-    rating REAL NOT NULL CHECK (rating BETWEEN 0.5 AND 5.0),
-    rated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(user_id, movie_id)
-);
-
-CREATE TABLE IF NOT EXISTS cinematch_v2.not_interested (
-    id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    movie_id INTEGER NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(user_id, movie_id)
-);
-"""
+from backend.migrate import run_migrations
 
 
 def _resolve_database_url() -> str:
@@ -60,12 +33,8 @@ def get_connection() -> Engine:
     if _engine is not None:
         return _engine
     url = _resolve_database_url()
-    engine = create_engine(url, pool_pre_ping=True)
-    with engine.begin() as conn:
-        for stmt in _SCHEMA_DDL.strip().split(";"):
-            stmt = stmt.strip()
-            if stmt:
-                conn.execute(text(stmt))
+    engine = create_engine(url, pool_pre_ping=True, pool_recycle=300)
+    run_migrations(engine)
     _engine = engine
     return engine
 
@@ -130,6 +99,28 @@ def get_watched_ids(engine: Engine, user_id: str) -> set:
     return {r[0] for r in rows}
 
 
+def get_watched_page(engine: Engine, user_id: str, page: int, page_size: int) -> tuple[int, list[tuple]]:
+    offset = (page - 1) * page_size
+    with engine.connect() as conn:
+        total = conn.execute(
+            text("SELECT count(*) FROM cinematch_v2.watched WHERE user_id = :uid"),
+            {"uid": user_id},
+        ).scalar_one()
+        rows = conn.execute(
+            text(
+                """SELECT w.movie_id, r.rating
+                   FROM cinematch_v2.watched AS w
+                   LEFT JOIN cinematch_v2.ratings AS r
+                     ON r.user_id = w.user_id AND r.movie_id = w.movie_id
+                   WHERE w.user_id = :uid
+                   ORDER BY w.watched_at DESC, w.movie_id
+                   LIMIT :limit OFFSET :offset"""
+            ),
+            {"uid": user_id, "limit": page_size, "offset": offset},
+        ).fetchall()
+    return int(total), rows
+
+
 def set_rating(engine: Engine, user_id: str, movie_id: int, rating: float):
     with engine.begin() as conn:
         conn.execute(
@@ -178,6 +169,22 @@ def get_profile(engine: Engine, user_id: str) -> tuple[set, dict]:
     watched_ids = {row[0] for row in rows}
     ratings = {row[0]: row[1] for row in rows if row[1] is not None}
     return watched_ids, ratings
+
+
+def get_movie_states(engine: Engine, user_id: str, movie_ids: list[int]) -> tuple[set, dict]:
+    """Load state only for the movies rendered on the current page."""
+    if not movie_ids:
+        return set(), {}
+    query = text(
+        """SELECT w.movie_id, r.rating
+           FROM cinematch_v2.watched AS w
+           LEFT JOIN cinematch_v2.ratings AS r
+             ON r.user_id = w.user_id AND r.movie_id = w.movie_id
+           WHERE w.user_id = :uid AND w.movie_id IN :movie_ids"""
+    ).bindparams(bindparam("movie_ids", expanding=True))
+    with engine.connect() as conn:
+        rows = conn.execute(query, {"uid": user_id, "movie_ids": movie_ids}).fetchall()
+    return {row[0] for row in rows}, {row[0]: row[1] for row in rows if row[1] is not None}
 
 
 def get_not_interested_ids(engine: Engine, user_id: str) -> set:

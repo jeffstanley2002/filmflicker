@@ -26,6 +26,7 @@ export type Recommendation = {
   score: number;
   reason: string;
   model: ModelKey;
+  source_model: ModelKey | null;
 };
 
 export type Analytics = {

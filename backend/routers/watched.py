@@ -1,46 +1,29 @@
-import sys
-from pathlib import Path
+from fastapi import APIRouter, Depends, Query
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from fastapi import APIRouter, Depends
-
-import data as data_module
-import db
-from auth import get_current_user_id
-from schemas import MovieOut
-from utils import safe_int, safe_str
+from backend import data as data_module
+from backend import db
+from backend.auth import get_current_user_id
+from backend.movie_mapper import movie_out
+from backend.schemas import MoviePage
 
 router = APIRouter(prefix="/watched", tags=["watched"])
 
 
-@router.get("", response_model=list[MovieOut])
-def get_watched(user_id: str = Depends(get_current_user_id)):
+@router.get("", response_model=MoviePage)
+def get_watched(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(24, ge=1, le=100),
+    user_id: str = Depends(get_current_user_id),
+):
     engine = db.get_connection()
-    watched_ids, ratings = db.get_profile(engine, user_id)
-    if not watched_ids:
-        return []
+    total, states = db.get_watched_page(engine, user_id, page, page_size)
     movies_df = data_module.movies_indexed()
     links = data_module.links_indexed()
-    sorted_ids = sorted(watched_ids, key=lambda m: ratings.get(m, 0), reverse=True)
 
     results = []
-    for mid in sorted_ids:
+    for mid, rating in states:
         if mid not in movies_df.index:
             continue
         row = movies_df.loc[mid]
-        imdb_id = links.loc[mid, "imdbId"] if mid in links.index else None
-        poster_url = data_module.poster_reference(safe_str(row.get("poster_url")), imdb_id)
-        results.append(
-            MovieOut(
-                movie_id=mid,
-                title=row["title"],
-                year=safe_int(row["year"]),
-                genres=row["genre_list"],
-                rating_count=0,
-                poster_url=poster_url,
-                watched=True,
-                user_rating=ratings.get(mid),
-            )
-        )
-    return results
+        results.append(movie_out(mid, row, links, watched=True, user_rating=rating))
+    return MoviePage(total=total, page=page, page_size=page_size, results=results)

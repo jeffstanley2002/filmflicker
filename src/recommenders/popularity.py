@@ -20,7 +20,10 @@ def train_and_save(movies: pd.DataFrame, ratings: pd.DataFrame, out_path: Path =
 
 
 def load(path: Path = ARTIFACT) -> pd.DataFrame:
-    df = pd.read_csv(path)
+    df = pd.read_csv(
+        path,
+        usecols=["movieId", "genres", "count", "mean", "weighted_score"],
+    )
     df["genre_list"] = df["genres"].apply(
         lambda g: [] if pd.isna(g) or g == "(no genres listed)" else g.split("|")
     )

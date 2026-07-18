@@ -1,0 +1,1 @@
+"""CineMatch FastAPI application package."""

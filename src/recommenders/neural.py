@@ -24,6 +24,8 @@ import numpy as np
 from src.recommenders.base import MODELS_DIR, Recommendation, profile_baseline
 
 ARTIFACT = MODELS_DIR / "neural_weights.npz"
+# Keep temporary matrix multiplications small enough for 512 MB deployments.
+INFERENCE_BATCH_SIZE = 1024
 
 
 def relu(x):
@@ -37,6 +39,7 @@ class NeuralRecommender:
         self.genre_matrix = weights["genre_matrix"]  # (n_movies, n_genres)
         self.Wi, self.bi = weights["Wi"], weights["bi"]  # item tower: Dense(embed_dim+n_genres -> latent_dim)
         self.global_mean = float(weights["global_mean"])
+        self.profile_baseline_strength = float(weights.get("profile_baseline_strength", 5.0))
         self.movie_ids = weights["movie_ids"]
         self.movie_idx = {int(m): i for i, m in enumerate(self.movie_ids)}
 
@@ -53,7 +56,7 @@ class NeuralRecommender:
         # Mean-centered (not sum-normalized): weights can be negative for
         # disliked movies, and normalizing by their sum would blow up or
         # flip sign when positive/negative ratings nearly cancel out.
-        baseline = profile_baseline(known, self.global_mean)
+        baseline = profile_baseline(known, self.global_mean, strength=self.profile_baseline_strength)
         weights = np.array([r - baseline for r in known.values()], dtype=np.float32)
         return (item_vecs * weights[:, None]).mean(axis=0)
 
@@ -62,9 +65,15 @@ class NeuralRecommender:
         if len(idxs) == 0:
             return idxs, np.array([], dtype=np.float32)
         user_vec = self.implied_user_vector(rated)
-        item_vecs = self._item_tower(idxs)
-        baseline = profile_baseline(rated, self.global_mean)
-        preds = baseline + item_vecs.dot(user_vec) + self.movie_bias[idxs]
+        baseline = profile_baseline(rated, self.global_mean, strength=self.profile_baseline_strength)
+        preds = np.empty(len(idxs), dtype=np.float32)
+        for start in range(0, len(idxs), INFERENCE_BATCH_SIZE):
+            stop = min(start + INFERENCE_BATCH_SIZE, len(idxs))
+            batch_indexes = idxs[start:stop]
+            item_vectors = self._item_tower(batch_indexes)
+            preds[start:stop] = (
+                baseline + item_vectors.dot(user_vec) + self.movie_bias[batch_indexes]
+            )
         return idxs, np.clip(preds, 0.5, 5.0)
 
     def recommend_for_profile(self, rated: dict, n: int = 10, exclude_ids=None) -> list:
@@ -96,6 +105,6 @@ def save_weights(weights: dict, out_path: Path = ARTIFACT):
 
 
 def load(path: Path = ARTIFACT) -> NeuralRecommender:
-    data = np.load(path)
-    weights = {k: data[k] for k in data.files}
+    with np.load(path) as data:
+        weights = {key: data[key] for key in data.files}
     return NeuralRecommender(weights)

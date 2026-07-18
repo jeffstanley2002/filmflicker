@@ -14,9 +14,19 @@ function topEntries(record: Record<string, number>, limit = 8) {
     .map(([name, value]) => ({ name, value }));
 }
 
+function orderedEntries(record: Record<string, number>, parser: (key: string) => number) {
+  return Object.entries(record)
+    .sort((a, b) => parser(a[0]) - parser(b[0]))
+    .map(([name, value]) => ({ name, value }));
+}
+
+function chartSummary(label: string, values: { name: string; value: number }[]) {
+  return `${label}: ${values.map((item) => `${item.name}, ${item.value}`).join("; ")}.`;
+}
+
 
 export function AnalyticsPage({ token }: { token: string }) {
-  const { data, loading, error } = useAsync(() => getAnalytics(token), [token]);
+  const { data, loading, error } = useAsync((signal) => getAnalytics(token, signal), [token]);
 
   if (loading) return <Loading label="Building taste profile" />;
   if (error) return <EmptyState icon={BarChart3} title="Could not load analytics" body={error} />;
@@ -26,8 +36,8 @@ export function AnalyticsPage({ token }: { token: string }) {
   }
 
   const genres = topEntries(data.genre_breakdown);
-  const ratings = topEntries(data.rating_distribution, 10);
-  const decades = topEntries(data.decade_breakdown);
+  const ratings = orderedEntries(data.rating_distribution, Number);
+  const decades = orderedEntries(data.decade_breakdown, (key) => Number.parseInt(key, 10));
   const clusters = topEntries(data.cluster_breakdown);
   const favoriteGenre = genres[0]?.name ?? "still forming";
   const signatureDecade = decades[0]?.name ?? "mixed eras";
@@ -73,6 +83,7 @@ export function AnalyticsPage({ token }: { token: string }) {
       <section className="analytics-grid">
         <article className="chart-panel">
           <h2>Genre pull</h2>
+          <p className="sr-only">{chartSummary("Genre counts", genres)}</p>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
               <Pie data={genres} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
@@ -84,6 +95,7 @@ export function AnalyticsPage({ token }: { token: string }) {
         </article>
         <article className="chart-panel">
           <h2>Ratings</h2>
+          <p className="sr-only">{chartSummary("Rating counts", ratings)}</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={ratings}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d8ded8" />
@@ -96,6 +108,7 @@ export function AnalyticsPage({ token }: { token: string }) {
         </article>
         <article className="chart-panel">
           <h2>Decades</h2>
+          <p className="sr-only">{chartSummary("Decade counts", decades)}</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={decades}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d8ded8" />
@@ -108,6 +121,7 @@ export function AnalyticsPage({ token }: { token: string }) {
         </article>
         <article className="chart-panel">
           <h2>Discovery styles</h2>
+          <p className="sr-only">{chartSummary("Discovery style counts", clusters)}</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={clusters}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d8ded8" />

@@ -2,18 +2,26 @@ import { BarChart3, ChevronLeft, ChevronRight, Film, Heart, LogOut, Radar, Searc
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { errorMessage } from "../lib/errors";
 
-export function AppShell({ email, onSignOut }: { email: string; onSignOut: () => void }) {
+export function AppShell({ email, onSignOut }: { email: string; onSignOut: () => Promise<void> }) {
   const [collapsed, setCollapsed] = useState(false);
   const [peeking, setPeeking] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const name = email.split("@")[0] || "Movie friend";
 
   async function confirmSignOut() {
     setSigningOut(true);
-    await onSignOut();
-    setSigningOut(false);
+    setSignOutError(null);
+    try {
+      await onSignOut();
+    } catch (error) {
+      setSignOutError(errorMessage(error, "Unable to sign out. Please try again."));
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   return (
@@ -40,7 +48,7 @@ export function AppShell({ email, onSignOut }: { email: string; onSignOut: () =>
               <span>Level {Math.max(1, name.length)} taste scout</span>
             </div>
           </div>
-          <button className="ghost-button" onClick={() => setConfirmingSignOut(true)}><LogOut size={16} /><span>Sign out</span></button>
+          <button className="ghost-button" onClick={() => { setSignOutError(null); setConfirmingSignOut(true); }}><LogOut size={16} /><span>Sign out</span></button>
         </div>
         {collapsed ? <div className="sidebar-reveal" onMouseEnter={() => setPeeking(true)} aria-hidden="true" /> : null}
       </aside>
@@ -51,9 +59,9 @@ export function AppShell({ email, onSignOut }: { email: string; onSignOut: () =>
         open={confirmingSignOut}
         busy={signingOut}
         title="Sign out of CineMatch?"
-        body="Your ratings and watched list are saved. You can jump back in anytime."
+        body={signOutError ?? "Your ratings and watched list are saved. You can jump back in anytime."}
         confirmLabel="Sign out"
-        onCancel={() => setConfirmingSignOut(false)}
+        onCancel={() => { setConfirmingSignOut(false); setSignOutError(null); }}
         onConfirm={confirmSignOut}
       />
     </div>

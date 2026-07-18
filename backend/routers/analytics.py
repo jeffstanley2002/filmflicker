@@ -1,16 +1,12 @@
-import sys
 from collections import Counter
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 from fastapi import APIRouter, Depends
 
-import data as data_module
-import db
-from auth import get_current_user_id
-from schemas import AnalyticsOut
+from backend import data as data_module
+from backend import db
+from backend.auth import get_current_user_id
+from backend.schemas import AnalyticsOut
 from src.recommenders import clustering
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -48,7 +44,9 @@ def get_analytics(user_id: str = Depends(get_current_user_id)):
 
     artifacts = data_module.clustering_artifacts()
     cluster_counts = clustering.profile_cluster_counts(watched_ids, artifacts)
-    cluster_breakdown = {clustering.cluster_label(c, artifacts): n for c, n in cluster_counts.items()}
+    cluster_breakdown = Counter()
+    for cluster_id, count in cluster_counts.items():
+        cluster_breakdown[clustering.cluster_label(cluster_id, artifacts)] += count
 
     return AnalyticsOut(
         movies_watched=len(watched_ids),
@@ -57,5 +55,5 @@ def get_analytics(user_id: str = Depends(get_current_user_id)):
         genre_breakdown=dict(genre_counts),
         rating_distribution=dict(rating_counts),
         decade_breakdown=dict(decade_counts),
-        cluster_breakdown=cluster_breakdown,
+        cluster_breakdown=dict(cluster_breakdown),
     )

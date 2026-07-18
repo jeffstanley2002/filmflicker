@@ -3,6 +3,13 @@ import numpy as np
 
 from src.recommenders.base import Recommendation
 
+DEFAULT_CONFIG = {
+    "personalized_weight": 0.85,
+    "quality_weight": 0.15,
+    "novelty_weight": 0.0,
+    "diversity_strength": 0.08,
+}
+
 
 def _minmax(values: np.ndarray) -> np.ndarray:
     if len(values) == 0:
@@ -18,9 +25,24 @@ def _genre_distance(left: set, right: set) -> float:
     return 1.0 - (len(left & right) / len(union) if union else 0.0)
 
 
-def rerank_candidates(candidates: list[Recommendation], movies_df, pop_df, n: int, primary_model: str, diversity_strength: float = 0.16) -> list[Recommendation]:
+def rerank_candidates(
+    candidates: list[Recommendation],
+    movies_df,
+    pop_df,
+    n: int,
+    primary_model: str,
+    config: dict | None = None,
+) -> list[Recommendation]:
     if not candidates or n <= 0:
         return []
+
+    config = {**DEFAULT_CONFIG, **(config or {})}
+    weight_total = sum(config[key] for key in ("personalized_weight", "quality_weight", "novelty_weight"))
+    if weight_total <= 0:
+        raise ValueError("At least one reranking weight must be positive")
+    personalized_weight = config["personalized_weight"] / weight_total
+    quality_weight = config["quality_weight"] / weight_total
+    novelty_weight = config["novelty_weight"] / weight_total
 
     scores_by_model = {}
     for model in {rec.model for rec in candidates}:
@@ -49,7 +71,7 @@ def rerank_candidates(candidates: list[Recommendation], movies_df, pop_df, n: in
         for rec in candidates
     ])
     novelty = 1.0 - _minmax(np.log1p(counts))
-    base_scores = 0.72 * personalized + 0.23 * quality + 0.05 * novelty
+    base_scores = personalized_weight * personalized + quality_weight * quality + novelty_weight * novelty
 
     genres = {
         rec.movie_id: set(movies_df.loc[rec.movie_id, "genre_list"])
@@ -68,7 +90,7 @@ def rerank_candidates(candidates: list[Recommendation], movies_df, pop_df, n: in
                 )
             else:
                 similarity_penalty = 0.0
-            score = float(base_scores[index] - diversity_strength * similarity_penalty)
+            score = float(base_scores[index] - config["diversity_strength"] * similarity_penalty)
             if score > best_score:
                 best_index, best_score = index, score
         selected.append(best_index)
@@ -80,6 +102,7 @@ def rerank_candidates(candidates: list[Recommendation], movies_df, pop_df, n: in
             score=float(base_scores[index]),
             reason=candidates[index].reason,
             model=primary_model,
+            source_model=candidates[index].source_model or candidates[index].model,
         )
         for index in selected
     ]

@@ -32,9 +32,9 @@ def train_and_save(movies, tags, out_dir: Path = MODELS_DIR):
     matrix = vectorizer.fit_transform(corpus.values)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    joblib.dump(vectorizer, VECTORIZER_PATH)
-    sparse.save_npz(MATRIX_PATH, matrix)
-    np.save(MOVIE_IDS_PATH, corpus.index.values)
+    joblib.dump(vectorizer, out_dir / VECTORIZER_PATH.name)
+    sparse.save_npz(out_dir / MATRIX_PATH.name, matrix)
+    np.save(out_dir / MOVIE_IDS_PATH.name, corpus.index.values)
     return vectorizer, matrix, corpus.index.values
 
 

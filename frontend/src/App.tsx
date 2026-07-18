@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
@@ -22,6 +22,7 @@ function RequireAuth({ session, children }: { session: Session | null; children:
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const clearingInvalidSession = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -29,18 +30,37 @@ export function App() {
       setLoading(false);
       return;
     }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => setSession(data.session))
+      .catch(() => setSession(null))
+      .finally(() => setLoading(false));
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
     });
     return () => data.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    function unauthorized() {
+      if (clearingInvalidSession.current) return;
+      clearingInvalidSession.current = true;
+      void (async () => {
+        try {
+          await supabase?.auth.signOut({ scope: "local" });
+        } finally {
+          setSession(null);
+          navigate("/auth", { replace: true });
+          clearingInvalidSession.current = false;
+        }
+      })();
+    }
+    window.addEventListener("cinematch:unauthorized", unauthorized);
+    return () => window.removeEventListener("cinematch:unauthorized", unauthorized);
+  }, [navigate]);
+
   async function signOut() {
-    await supabase?.auth.signOut();
+    const result = await supabase?.auth.signOut();
+    if (result?.error) throw result.error;
     setSession(null);
     navigate("/");
   }

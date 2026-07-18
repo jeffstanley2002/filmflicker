@@ -143,3 +143,10 @@ class TestNeural:
         idxs, preds = model.predict_for_profile(sample_rated, [-999])
         assert len(idxs) == 0
         assert len(preds) == 0
+
+    def test_batched_predictions_preserve_requested_movie_count(self, model, sample_rated):
+        movie_ids = [int(movie_id) for movie_id in model.movie_ids[:5000]]
+        idxs, preds = model.predict_for_profile(sample_rated, movie_ids)
+        assert len(idxs) == len(movie_ids)
+        assert len(preds) == len(movie_ids)
+        assert np.isfinite(preds).all()

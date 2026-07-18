@@ -1,13 +1,13 @@
 import pandas as pd
 
 
-def safe_int(v):
-    return int(v) if pd.notna(v) else None
+def safe_int(value) -> int | None:
+    return int(value) if pd.notna(value) else None
 
 
-def safe_float(v):
-    return float(v) if pd.notna(v) else None
+def safe_float(value) -> float | None:
+    return float(value) if pd.notna(value) else None
 
 
-def safe_str(v):
-    return str(v) if pd.notna(v) and v != "" else None
+def safe_str(value) -> str | None:
+    return str(value) if pd.notna(value) and value != "" else None

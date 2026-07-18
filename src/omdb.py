@@ -22,6 +22,8 @@ IMDB_SUGGESTION_URL = "https://v2.sg.media-imdb.com/suggestion/x/{imdb_id}.json"
 # write; the slow network call stays outside it, so pages still fetch
 # posters in genuine parallel.
 _CACHE_LOCK = threading.Lock()
+_FETCH_LOCKS: dict[str, threading.Lock] = {}
+_FETCH_LOCKS_GUARD = threading.Lock()
 
 # Deterministic placeholder color per genre so cards stay visually distinct
 # even without real posters.
@@ -91,7 +93,7 @@ def _fetch_imdb_poster(imdb_id: str) -> str | None:
     return _optimize_imdb_poster(image.get("imageUrl") or image.get("imageURL"))
 
 
-def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
+def _fetch_metadata_with_conn(imdb_id, conn: sqlite3.Connection) -> dict:
     """Returns dict with poster_url/plot/director/runtime keys (values may be
     None). Never raises - network/API failures just mean less metadata."""
     empty = {"poster_url": None, "plot": None, "director": None, "runtime": None}
@@ -99,8 +101,6 @@ def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
         return empty
 
     imdb_id = normalize_imdb_id(imdb_id)
-    conn = conn or get_cache_conn()
-
     with _CACHE_LOCK:
         row = conn.execute(
             """SELECT poster_url, plot, director, runtime,
@@ -159,3 +159,21 @@ def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
         )
         conn.commit()
     return result
+
+
+def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
+    """Fetch metadata with one in-flight request per IMDb ID and no leaked handles."""
+    empty = {"poster_url": None, "plot": None, "director": None, "runtime": None}
+    if not imdb_id or (isinstance(imdb_id, float) and imdb_id != imdb_id):
+        return empty
+    normalized = normalize_imdb_id(imdb_id)
+    with _FETCH_LOCKS_GUARD:
+        fetch_lock = _FETCH_LOCKS.setdefault(normalized, threading.Lock())
+    owns_connection = conn is None
+    connection = conn or get_cache_conn()
+    try:
+        with fetch_lock:
+            return _fetch_metadata_with_conn(normalized, connection)
+    finally:
+        if owns_connection:
+            connection.close()

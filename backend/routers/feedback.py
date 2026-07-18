@@ -1,13 +1,8 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from fastapi import APIRouter, Depends, HTTPException
 
-import data as data_module
-import db
-from auth import get_current_user_id
+from backend import data as data_module
+from backend import db
+from backend.auth import get_current_user_id
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 

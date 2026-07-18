@@ -15,6 +15,7 @@ frontend/.next/
 frontend/dist/
 frontend/.env.local
 *.tsbuildinfo
+frontend/.tsbuild/
 data/downloads/
 data/ml-32m/
 data/processed/ratings.csv

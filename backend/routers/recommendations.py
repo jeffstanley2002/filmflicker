@@ -1,42 +1,19 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from fastapi import APIRouter, Depends, Query
 
-import data as data_module
-import db
-from auth import get_current_user_id
-from schemas import RecommendationOut
-from utils import safe_int, safe_str
+from backend import data as data_module
+from backend import db
+from backend.auth import get_current_user_id
+from backend.movie_mapper import recommendation_list
+from backend.rate_limit import rate_limit
+from backend.schemas import RecommendationOut
 
 from src.recommenders import content_based, ensemble
 
-router = APIRouter(prefix="/recommendations", tags=["recommendations"])
-
-
-def _to_rec_out(rec, movies_df, links):
-    if rec.movie_id not in movies_df.index:
-        return None
-    row = movies_df.loc[rec.movie_id]
-    imdb_id = links.loc[rec.movie_id, "imdbId"] if rec.movie_id in links.index else None
-    poster_url = data_module.poster_reference(safe_str(row.get("poster_url")), imdb_id)
-    return RecommendationOut(
-        movie_id=rec.movie_id,
-        title=row["title"],
-        year=safe_int(row["year"]),
-        genres=row["genre_list"],
-        poster_url=poster_url,
-        score=rec.score,
-        reason=rec.reason,
-        model=rec.model,
-    )
-
-
-def _attach_posters_and_serialize(recs, movies_df, links):
-    out = [_to_rec_out(r, movies_df, links) for r in recs]
-    return [o for o in out if o is not None]
+router = APIRouter(
+    prefix="/recommendations",
+    tags=["recommendations"],
+    dependencies=[Depends(rate_limit("recommendations", 30, 60))],
+)
 
 
 @router.get("", response_model=list[RecommendationOut])
@@ -73,7 +50,7 @@ def get_recommendations(
         artifacts=artifacts,
     )
 
-    return _attach_posters_and_serialize(recs, movies_df, links)
+    return recommendation_list(recs, movies_df, links)
 
 
 @router.get("/similar/{movie_id}", response_model=list[RecommendationOut])
@@ -88,4 +65,4 @@ def similar_movies(movie_id: int, n: int = Query(8, ge=1, le=50), user_id: str =
     links = data_module.links_indexed()
     from src.recommenders import ranking
     recs = ranking.rerank_candidates(recs, movies_df, data_module.popularity_table(), n=n, primary_model="content_based")
-    return _attach_posters_and_serialize(recs, movies_df, links)
+    return recommendation_list(recs, movies_df, links)
