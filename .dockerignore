@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+backend/.venv
+backend/.env
+frontend
+app_data
+data/downloads
+data/ml-32m
+data/processed/ratings.csv
+data/processed/tags.csv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache

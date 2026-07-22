@@ -49,6 +49,7 @@ def train_and_save(movies, ratings, out_path: Path = ARTIFACT, n_clusters: int =
         "genres": genres,
         "movie_ids": movies["movieId"].values,
         "labels": labels,
+        "cluster_profiles": _build_cluster_profiles(movies, labels),
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(artifacts, out_path)
@@ -66,6 +67,33 @@ def cluster_of(movie_id: int, artifacts: dict):
     return int(artifacts["labels"][idx_map[movie_id]])
 
 
+def _build_cluster_profiles(movies: pd.DataFrame, labels: np.ndarray) -> dict:
+    profiles = {}
+    labeled = movies[["genre_list", "year"]].copy()
+    labeled["cluster"] = labels
+    for cluster_id, group in labeled.groupby("cluster"):
+        genre_counts = {}
+        for genres in group["genre_list"]:
+            for genre in genres:
+                if genre not in {"IMAX", "(no genres listed)"}:
+                    genre_counts[genre] = genre_counts.get(genre, 0) + 1
+        top_genres = [genre for genre, _ in sorted(genre_counts.items(), key=lambda item: (-item[1], item[0]))[:2]]
+        label = " + ".join(top_genres) if top_genres else "Eclectic cinema"
+        years = pd.to_numeric(group["year"], errors="coerce").dropna()
+        profiles[int(cluster_id)] = {
+            "label": label,
+            "top_genres": top_genres,
+            "median_year": int(years.median()) if not years.empty else None,
+            "movie_count": int(len(group)),
+        }
+    return profiles
+
+
+def cluster_label(cluster_id: int, artifacts: dict) -> str:
+    profile = artifacts.get("cluster_profiles", {}).get(cluster_id, {})
+    return profile.get("label") or f"Discovery group {cluster_id + 1}"
+
+
 def profile_cluster_counts(watched_ids: set, artifacts: dict) -> dict:
     idx_map = {m: i for i, m in enumerate(artifacts["movie_ids"])}
     counts = {}
@@ -76,24 +104,37 @@ def profile_cluster_counts(watched_ids: set, artifacts: dict) -> dict:
     return counts
 
 
-def recommend_for_profile(watched_ids: set, artifacts: dict, pop_df, n: int = 10, exclude_ids=None) -> list:
-    counts = profile_cluster_counts(watched_ids, artifacts)
-    if not counts:
+def profile_cluster_scores(profile, artifacts: dict) -> dict:
+    ratings = profile if isinstance(profile, dict) else {movie_id: 3.5 for movie_id in profile}
+    idx_map = {int(movie_id): i for i, movie_id in enumerate(artifacts["movie_ids"])}
+    scores = {}
+    for movie_id, rating in ratings.items():
+        if movie_id not in idx_map or rating <= 2.5:
+            continue
+        cluster_id = int(artifacts["labels"][idx_map[movie_id]])
+        scores[cluster_id] = scores.get(cluster_id, 0.0) + float(rating - 2.5)
+    return scores
+
+
+def recommend_for_profile(profile, artifacts: dict, pop_df, n: int = 10, exclude_ids=None) -> list:
+    scores = profile_cluster_scores(profile, artifacts)
+    if not scores:
         return []
-    top_cluster = max(counts, key=counts.get)
-
+    top_clusters = sorted(scores, key=scores.get, reverse=True)[:3]
+    max_affinity = max(scores.values())
     movie_ids = artifacts["movie_ids"]
-    in_cluster = set(int(m) for m, lab in zip(movie_ids, artifacts["labels"]) if lab == top_cluster)
-    exclude = set(exclude_ids or set()) | watched_ids
-
-    candidates = pop_df[pop_df["movieId"].isin(in_cluster - exclude)]
-    candidates = candidates.sort_values("weighted_score", ascending=False).head(n)
-    return [
-        Recommendation(
-            movie_id=row.movieId,
-            score=float(row.weighted_score),
-            reason=f"From taste cluster #{top_cluster}, your most-watched cluster",
-            model="clustering",
-        )
-        for row in candidates.itertuples()
-    ]
+    label_by_movie = {int(movie_id): int(label) for movie_id, label in zip(movie_ids, artifacts["labels"])}
+    exclude = set(exclude_ids or set()) | set(profile.keys() if isinstance(profile, dict) else profile)
+    candidates = pop_df[
+        pop_df["movieId"].map(label_by_movie).isin(top_clusters) & ~pop_df["movieId"].isin(exclude)
+    ].copy()
+    candidates["cluster_id"] = candidates["movieId"].map(label_by_movie)
+    candidates["cluster_affinity"] = candidates["cluster_id"].map(scores) / max_affinity
+    candidates["profile_score"] = candidates["weighted_score"] * (1.0 + 0.18 * candidates["cluster_affinity"])
+    candidates = candidates.sort_values("profile_score", ascending=False).head(n)
+    return [Recommendation(
+        movie_id=int(row.movieId),
+        score=float(row.profile_score),
+        reason=f"A strong match for your {cluster_label(int(row.cluster_id), artifacts)} taste",
+        model="clustering",
+    ) for row in candidates.itertuples()]

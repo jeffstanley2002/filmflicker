@@ -66,6 +66,24 @@ def test_user_item_matrix_shape_matches_unique_counts(synthetic_ratings):
     assert mat[u_pos, m_pos] == 5.0
 
 
+def test_load_ratings_falls_back_when_processed_ratings_are_not_committed(monkeypatch, tmp_path):
+    processed = tmp_path / "processed"
+    fallback = tmp_path / "ml-latest-small"
+    processed.mkdir()
+    fallback.mkdir()
+    (processed / "movies.csv").write_text("movieId,title,genres\n1,Movie (2000),Drama\n")
+    (fallback / "ratings.csv").write_text("userId,movieId,rating,timestamp\n1,1,4.5,123\n")
+
+    monkeypatch.setattr(data_utils, "DATA_DIR", processed)
+    monkeypatch.setattr(data_utils, "PROCESSED_DATA_DIR", processed)
+    monkeypatch.setattr(data_utils, "DEFAULT_DATA_DIR", fallback)
+
+    ratings = data_utils.load_ratings()
+
+    assert ratings.loc[0, "movieId"] == 1
+    assert ratings.loc[0, "rating"] == 4.5
+
+
 def test_movie_text_corpus_includes_genres_for_every_movie(synthetic_movies_featured):
     tags = pd.DataFrame({"userId": [1], "movieId": [1], "tag": ["revenge"], "timestamp": [0]})
     corpus = data_utils.movie_text_corpus(synthetic_movies_featured, tags)

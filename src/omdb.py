@@ -12,10 +12,9 @@ import requests
 
 CACHE_DB = Path(__file__).resolve().parent.parent / "app_data" / "omdb_cache.db"
 OMDB_URL = "https://www.omdbapi.com/"
+IMDB_SUGGESTION_URL = "https://v2.sg.media-imdb.com/suggestion/x/{imdb_id}.json"
 
-# fetch_metadata is called concurrently from a thread pool (see
-# cache.fetch_omdb_batch) but a single sqlite3.Connection is shared across
-# those threads (see get_cache_conn). SQLite's C library is safe for that
+# fetch_metadata is called concurrently from a thread pool. SQLite's C library is safe for that
 # (threadsafety level 3), but the *Python* Connection object's own
 # transaction bookkeeping isn't - concurrent execute()/commit() calls on one
 # Connection from different threads can interleave and raise "cannot commit
@@ -23,6 +22,8 @@ OMDB_URL = "https://www.omdbapi.com/"
 # write; the slow network call stays outside it, so pages still fetch
 # posters in genuine parallel.
 _CACHE_LOCK = threading.Lock()
+_FETCH_LOCKS: dict[str, threading.Lock] = {}
+_FETCH_LOCKS_GUARD = threading.Lock()
 
 # Deterministic placeholder color per genre so cards stay visually distinct
 # even without real posters.
@@ -45,22 +46,6 @@ def genre_color(genres: list) -> str:
 
 
 def _get_api_key():
-    # Only touch st.secrets if a secrets file actually exists - Streamlit
-    # renders a visible "no secrets found" notice on first access otherwise,
-    # even when the lookup is wrapped in try/except.
-    secrets_paths = [
-        Path(__file__).resolve().parent.parent / ".streamlit" / "secrets.toml",
-        Path.home() / ".streamlit" / "secrets.toml",
-    ]
-    if any(p.exists() for p in secrets_paths):
-        try:
-            import streamlit as st
-
-            key = st.secrets.get("OMDB_API_KEY")
-            if key:
-                return key
-        except Exception:
-            pass
     return os.environ.get("OMDB_API_KEY")
 
 
@@ -83,32 +68,59 @@ def get_cache_conn() -> sqlite3.Connection:
     return conn
 
 
-def _normalize_imdb_id(imdb_id) -> str:
+def normalize_imdb_id(imdb_id) -> str:
     s = str(imdb_id)
     return s if s.startswith("tt") else f"tt{s.zfill(7)}"
 
 
-def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
+def _optimize_imdb_poster(url: str | None) -> str | None:
+    if url and "m.media-amazon.com" in url and url.endswith("._V1_.jpg"):
+        return f"{url[:-len('._V1_.jpg')]}._V1_QL75_UX500_.jpg"
+    return url
+
+
+def _fetch_imdb_poster(imdb_id: str) -> str | None:
+    """Use IMDb's public suggestion response when OMDb is not configured."""
+    try:
+        response = requests.get(IMDB_SUGGESTION_URL.format(imdb_id=imdb_id), timeout=5)
+        response.raise_for_status()
+        matches = response.json().get("d", [])
+    except (requests.RequestException, ValueError, AttributeError):
+        return None
+
+    match = next((item for item in matches if item.get("id") == imdb_id), None)
+    image = (match or {}).get("i") or {}
+    return _optimize_imdb_poster(image.get("imageUrl") or image.get("imageURL"))
+
+
+def _fetch_metadata_with_conn(imdb_id, conn: sqlite3.Connection) -> dict:
     """Returns dict with poster_url/plot/director/runtime keys (values may be
     None). Never raises - network/API failures just mean less metadata."""
     empty = {"poster_url": None, "plot": None, "director": None, "runtime": None}
     if not imdb_id or (isinstance(imdb_id, float) and imdb_id != imdb_id):  # NaN check
         return empty
 
-    imdb_id = _normalize_imdb_id(imdb_id)
-    conn = conn or get_cache_conn()
-
+    imdb_id = normalize_imdb_id(imdb_id)
     with _CACHE_LOCK:
         row = conn.execute(
-            "SELECT poster_url, plot, director, runtime FROM omdb_cache WHERE imdb_id = ?",
+            """SELECT poster_url, plot, director, runtime,
+                      fetched_at >= datetime('now', '-1 day') AS fresh
+               FROM omdb_cache WHERE imdb_id = ?""",
             (imdb_id,),
         ).fetchone()
-    if row:
-        return {"poster_url": row[0], "plot": row[1], "director": row[2], "runtime": row[3]}
+    if row and (row[0] or row[4]):
+        return {"poster_url": _optimize_imdb_poster(row[0]), "plot": row[1], "director": row[2], "runtime": row[3]}
 
     api_key = _get_api_key()
     if not api_key:
-        return empty
+        result = {**empty, "poster_url": _fetch_imdb_poster(imdb_id)}
+        with _CACHE_LOCK:
+            conn.execute(
+                "INSERT OR REPLACE INTO omdb_cache (imdb_id, poster_url, plot, director, runtime) VALUES (?,?,?,?,?)",
+                (imdb_id, result["poster_url"], None, None, None),
+            )
+            conn.commit()
+        return result
 
     try:
         resp = requests.get(OMDB_URL, params={"i": imdb_id, "apikey": api_key}, timeout=5)
@@ -121,14 +133,15 @@ def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
         return empty
 
     if data.get("Response") != "True":
+        poster_url = _fetch_imdb_poster(imdb_id)
         # Cache the miss too, so we don't hammer OMDb for movies it doesn't have.
         with _CACHE_LOCK:
             conn.execute(
                 "INSERT OR REPLACE INTO omdb_cache (imdb_id, poster_url, plot, director, runtime) VALUES (?,?,?,?,?)",
-                (imdb_id, None, None, None, None),
+                (imdb_id, poster_url, None, None, None),
             )
             conn.commit()
-        return empty
+        return {**empty, "poster_url": poster_url}
 
     def clean(v):
         return v if v and v != "N/A" else None
@@ -146,3 +159,21 @@ def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
         )
         conn.commit()
     return result
+
+
+def fetch_metadata(imdb_id, conn: sqlite3.Connection = None) -> dict:
+    """Fetch metadata with one in-flight request per IMDb ID and no leaked handles."""
+    empty = {"poster_url": None, "plot": None, "director": None, "runtime": None}
+    if not imdb_id or (isinstance(imdb_id, float) and imdb_id != imdb_id):
+        return empty
+    normalized = normalize_imdb_id(imdb_id)
+    with _FETCH_LOCKS_GUARD:
+        fetch_lock = _FETCH_LOCKS.setdefault(normalized, threading.Lock())
+    owns_connection = conn is None
+    connection = conn or get_cache_conn()
+    try:
+        with fetch_lock:
+            return _fetch_metadata_with_conn(normalized, connection)
+    finally:
+        if owns_connection:
+            connection.close()
