@@ -41,8 +41,11 @@ def load_movies() -> pd.DataFrame:
 
 
 def load_ratings() -> pd.DataFrame:
+    ratings_path = DATA_DIR / "ratings.csv"
+    if not ratings_path.exists() and DATA_DIR == PROCESSED_DATA_DIR:
+        ratings_path = DEFAULT_DATA_DIR / "ratings.csv"
     return pd.read_csv(
-        DATA_DIR / "ratings.csv",
+        ratings_path,
         dtype={"userId": np.int32, "movieId": np.int32, "rating": np.float32, "timestamp": np.int64},
     )
 
