@@ -2,10 +2,11 @@ services:
   - type: web
     name: cinematch-api
     runtime: docker
-    plan: standard
+    plan: free
+    branch: main
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    autoDeploy: false
+    autoDeployTrigger: commit
     envVars:
       - key: APP_ENV
         value: production
