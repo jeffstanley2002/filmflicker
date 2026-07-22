@@ -25,6 +25,31 @@ CREATE TABLE IF NOT EXISTS cinematch_v2.not_interested (
     UNIQUE(user_id, movie_id)
 );
 
+ALTER TABLE cinematch_v2.watched ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cinematch_v2.ratings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cinematch_v2.not_interested ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY watched_owner_access
+    ON cinematch_v2.watched
+    FOR ALL
+    TO authenticated
+    USING (user_id = (SELECT auth.uid()))
+    WITH CHECK (user_id = (SELECT auth.uid()));
+
+CREATE POLICY ratings_owner_access
+    ON cinematch_v2.ratings
+    FOR ALL
+    TO authenticated
+    USING (user_id = (SELECT auth.uid()))
+    WITH CHECK (user_id = (SELECT auth.uid()));
+
+CREATE POLICY not_interested_owner_access
+    ON cinematch_v2.not_interested
+    FOR ALL
+    TO authenticated
+    USING (user_id = (SELECT auth.uid()))
+    WITH CHECK (user_id = (SELECT auth.uid()));
+
 CREATE INDEX IF NOT EXISTS watched_user_time_idx
     ON cinematch_v2.watched (user_id, watched_at DESC);
 CREATE INDEX IF NOT EXISTS ratings_user_idx

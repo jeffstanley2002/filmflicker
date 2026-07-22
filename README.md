@@ -91,9 +91,21 @@ create table if not exists cinematch_v2.ratings (
   rated_at timestamptz not null default now(),
   unique (user_id, movie_id)
 );
+
+create table if not exists cinematch_v2.not_interested (
+  id serial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  movie_id integer not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, movie_id)
+);
+
+alter table cinematch_v2.watched enable row level security;
+alter table cinematch_v2.ratings enable row level security;
+alter table cinematch_v2.not_interested enable row level security;
 ```
 
-Every API query is scoped by the verified Supabase JWT subject, so users only read and mutate their own watch and rating rows.
+Every API query is scoped by the verified Supabase JWT subject, so users only read and mutate their own watch, rating, and not-interested rows. The migrations also enable Row-Level Security with owner-scoped policies for `authenticated` users and lock down any legacy `public` tables left from older local-storage experiments.
 
 ## Model Metrics
 
@@ -173,6 +185,8 @@ cd frontend && npm run lint && npm run build
 ## Deployment
 
 The root `Dockerfile` runs the API as one worker so the large read-only model cache is not duplicated. `render.yaml` declares the required secrets and readiness probe. Deploy `frontend/` separately on Vercel; `frontend/vercel.json` provides the SPA fallback. Set the production frontend origin in `ALLOWED_ORIGINS` and its API URL in `VITE_API_URL`.
+
+The `.github/workflows/keepalive.yml` workflow can ping the deployed API twice a day. Set the GitHub Actions secret `CINEMATCH_API_URL` to the deployed API origin, for example `https://cinematch-api.onrender.com`. The `/health` endpoint checks the database, which creates regular Supabase activity. Supabase Pro is still the only guaranteed way to prevent Free Plan inactivity pauses.
 
 Before the first production build, set all three Vercel variables: `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`. Use the exact Vercel origin (without a trailing slash) in the API's `ALLOWED_ORIGINS`.
 
