@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, Brain, Clapperboard, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, BarChart3, Brain, Clapperboard, ShieldCheck, Sparkles, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export function LandingPage() {
@@ -10,7 +10,11 @@ export function LandingPage() {
           <span>CineMatch</span>
         </Link>
         <nav>
-          <Link to="/auth" className="nav-cta">Sign in</Link>
+          <Link to="/signin" className="nav-cta">Sign in</Link>
+          <Link to="/register" className="nav-register">
+            <UserPlus size={17} />
+            Get started
+          </Link>
         </nav>
       </header>
 
@@ -23,7 +27,7 @@ export function LandingPage() {
             and explains every pick in human language.
           </p>
           <div className="hero-actions">
-            <Link className="primary-button" to="/auth">Open CineMatch <ArrowRight size={18} /></Link>
+            <Link className="primary-button" to="/register">Start matching <ArrowRight size={18} /></Link>
             <Link className="secondary-button" to="/system-design">View architecture</Link>
           </div>
         </div>

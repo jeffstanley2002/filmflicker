@@ -41,7 +41,7 @@ export function SystemDesignPage() {
           <span>CineMatch</span>
         </Link>
         <nav>
-          <Link to="/auth" className="nav-cta">Open app</Link>
+          <Link to="/signin" className="nav-cta">Open app</Link>
         </nav>
       </header>
 
@@ -52,7 +52,7 @@ export function SystemDesignPage() {
             <h1>A recommendation engine you can actually see.</h1>
             <p>Follow one rating as it becomes a smarter movie pick.</p>
           </div>
-          <Link className="primary-button" to="/auth">Open app <ArrowRight size={18} /></Link>
+          <Link className="primary-button" to="/signin">Open app <ArrowRight size={18} /></Link>
         </section>
 
         <section className="architecture-orbit" aria-label="CineMatch architecture illustration">

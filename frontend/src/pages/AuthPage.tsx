@@ -1,17 +1,40 @@
 import { FormEvent, useState } from "react";
-import { ArrowRight, Clapperboard, Film, Lock, Mail, Play, Sparkles, Star } from "lucide-react";
+import { ArrowRight, Clapperboard, Lock, Mail, Sparkles, UserPlus } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 import { BackButton } from "../components/BackButton";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { errorMessage } from "../lib/errors";
 import type { Session } from "@supabase/supabase-js";
 
-export function AuthPage({ session }: { session: Session | null }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+type AuthMode = "login" | "register";
+
+const authCopy = {
+  login: {
+    title: "Welcome back",
+    subtitle: "Pick up where your taste left off.",
+    primary: "Sign in",
+    switchKicker: "New here?",
+    switchTitle: "Build a movie profile in a few ratings.",
+    switchButton: "Get started",
+    switchTo: "/register",
+  },
+  register: {
+    title: "Start your movie profile",
+    subtitle: "Rate a few favorites. CineMatch handles the picks.",
+    primary: "Start matching",
+    switchKicker: "Already have picks?",
+    switchTitle: "Jump back into your movie queue.",
+    switchButton: "Sign in",
+    switchTo: "/signin",
+  },
+};
+
+function AuthPage({ session, mode }: { session: Session | null; mode: AuthMode }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const copy = authCopy[mode];
 
   if (session) return <Navigate to="/app/browse" replace />;
 
@@ -66,44 +89,21 @@ export function AuthPage({ session }: { session: Session | null }) {
 
   return (
     <div className="auth-page">
-      <div className="auth-art" aria-hidden="true">
-        <div className="signin-preview">
-          <div className="preview-header">
-            <span><Sparkles size={17} /> Taste preview</span>
-            <strong>Ready</strong>
-          </div>
-          <div className="preview-stage">
-            <div className="preview-card main">
-              <Film size={22} />
-              <span>Drama</span>
-            </div>
-            <div className="preview-card side-a">
-              <Play size={18} />
-              <span>Sci-Fi</span>
-            </div>
-            <div className="preview-card side-b">
-              <Star size={18} />
-              <span>4.7</span>
-            </div>
-          </div>
-          <div className="taste-meter-card">
-            <div>
-              <span>Recommendation signal</span>
-              <strong>Warm, witty, cinematic</strong>
-            </div>
-            <div className="taste-bars">
-              <span style={{ width: "86%" }} />
-              <span style={{ width: "64%" }} />
-              <span style={{ width: "74%" }} />
-            </div>
-          </div>
+      <aside className="auth-side" aria-hidden="true">
+        <p className="eyebrow">Movie night, tuned</p>
+        <h2>Find the film that actually fits your mood.</h2>
+        <div className="auth-taste-strip">
+          <span><Sparkles size={15} /> Smart picks</span>
+          <span>Private taste</span>
+          <span>Five models</span>
         </div>
-      </div>
+      </aside>
       <form className="auth-card" onSubmit={submit}>
         <BackButton fallback="/" />
         <div className="auth-brand"><Clapperboard size={28} /> CineMatch</div>
-        <h1>{mode === "login" ? "Welcome back" : "Create your account"}</h1>
-        <p>Save movies, tune your ratings, and keep your recommendation profile private to your account.</p>
+        <p className="auth-kicker">{mode === "login" ? "Now showing" : "First picks"}</p>
+        <h1>{copy.title}</h1>
+        <p>{copy.subtitle}</p>
         {!hasSupabaseConfig ? <div className="notice">Supabase frontend env vars are not configured yet.</div> : null}
         <div className="oauth-grid single">
           <button type="button" className="oauth-button" disabled={loading} onClick={signInWithGoogle}>
@@ -128,12 +128,26 @@ export function AuthPage({ session }: { session: Session | null }) {
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" minLength={6} required />
         </label>
         {message ? <div className="form-error">{message}</div> : null}
-        <button className="primary-button" disabled={loading}>{loading ? "Working..." : mode === "login" ? "Sign in" : "Create account"} <ArrowRight size={17} /></button>
-        <button type="button" className="text-button" onClick={() => setMode(mode === "login" ? "register" : "login")}>
-          {mode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
-        </button>
-        <p className="auth-footnote">Google sign-in uses Supabase Auth. Email remains available for fallback access. <Link to="/system-design">View architecture</Link></p>
+        <button className="primary-button" disabled={loading}>{loading ? "Working..." : copy.primary} <ArrowRight size={17} /></button>
+        <div className="auth-switch-panel">
+          <div>
+            <span>{copy.switchKicker}</span>
+            <strong>{copy.switchTitle}</strong>
+          </div>
+          <Link className="auth-switch-button" to={copy.switchTo}>
+            {mode === "login" ? <UserPlus size={17} /> : <ArrowRight size={17} />}
+            {copy.switchButton}
+          </Link>
+        </div>
       </form>
     </div>
   );
+}
+
+export function SignInPage({ session }: { session: Session | null }) {
+  return <AuthPage session={session} mode="login" />;
+}
+
+export function RegisterPage({ session }: { session: Session | null }) {
+  return <AuthPage session={session} mode="register" />;
 }

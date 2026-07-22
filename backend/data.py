@@ -27,6 +27,14 @@ REQUIRED_ARTIFACTS = (
 )
 
 
+def _sha256_file(path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _get(key, loader):
     if key not in _cache:
         _cache[key] = loader()
@@ -155,7 +163,7 @@ def artifact_status(*, verify_checksums: bool = False) -> dict:
             path = MODELS_DIR / name
             if not path.exists():
                 continue
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            digest = _sha256_file(path)
             if digest != expected:
                 errors.append(f"checksum mismatch: {name}")
         catalog_path = data_utils.DATA_DIR / "catalog_manifest.json"
@@ -164,7 +172,7 @@ def artifact_status(*, verify_checksums: bool = False) -> dict:
             errors.append("missing catalog manifest checksum")
         elif not catalog_path.exists():
             errors.append("missing catalog manifest")
-        elif hashlib.sha256(catalog_path.read_bytes()).hexdigest() != expected_catalog:
+        elif _sha256_file(catalog_path) != expected_catalog:
             errors.append("catalog manifest checksum mismatch")
     return {
         "ready": not errors,
@@ -176,12 +184,10 @@ def artifact_status(*, verify_checksums: bool = False) -> dict:
 
 
 def preload() -> None:
-    """Warm the default request path while keeping enough memory for traffic."""
+    """Warm small catalog data only; models load lazily on 512 MB deploys."""
     movies_indexed()
     links_indexed()
     popularity_table()
-    content_based_artifacts()
-    collaborative_artifacts()
     metrics()
 
 
