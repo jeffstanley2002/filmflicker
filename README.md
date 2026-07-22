@@ -1,6 +1,6 @@
-# CineMatch
+# FilmFlicker
 
-CineMatch is a production-oriented movie recommendation app with a React frontend, FastAPI backend, Supabase Auth, and five trained recommender strategies.
+FilmFlicker is a production-oriented movie recommendation app with a React frontend, FastAPI backend, Supabase Auth, and five trained recommender strategies.
 
 ## Stack
 
@@ -186,7 +186,7 @@ cd frontend && npm run lint && npm run build
 
 The root `Dockerfile` runs the API as one worker so the large read-only model cache is not duplicated. `render.yaml` declares the required secrets and readiness probe. Deploy `frontend/` separately on Vercel; `frontend/vercel.json` provides the SPA fallback. Set the production frontend origin in `ALLOWED_ORIGINS` and its API URL in `VITE_API_URL`.
 
-The `.github/workflows/keepalive.yml` workflow can ping the deployed API twice a day. Set the GitHub Actions secret `CINEMATCH_API_URL` to the deployed API origin, for example `https://cinematch-api.onrender.com`. The `/health` endpoint checks the database, which creates regular Supabase activity. Supabase Pro is still the only guaranteed way to prevent Free Plan inactivity pauses.
+The `.github/workflows/keepalive.yml` workflow can ping the deployed API twice a day. Set the GitHub Actions secret `FILMFLICKER_API_URL` to the deployed API origin, for example `https://filmflicker-api.onrender.com`. The `/health` endpoint checks the database, which creates regular Supabase activity. Supabase Pro is still the only guaranteed way to prevent Free Plan inactivity pauses.
 
 Before the first production build, set all three Vercel variables: `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`. Use the exact Vercel origin (without a trailing slash) in the API's `ALLOWED_ORIGINS`.
 

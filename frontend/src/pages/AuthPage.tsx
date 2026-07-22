@@ -1,7 +1,8 @@
 import { FormEvent, useState } from "react";
-import { ArrowRight, Clapperboard, Lock, Mail, Sparkles, UserPlus } from "lucide-react";
+import { ArrowRight, Lock, Mail, Sparkles, UserPlus } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 import { BackButton } from "../components/BackButton";
+import { BrandMark } from "../components/BrandMark";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { errorMessage } from "../lib/errors";
 import type { Session } from "@supabase/supabase-js";
@@ -20,7 +21,7 @@ const authCopy = {
   },
   register: {
     title: "Start your movie profile",
-    subtitle: "Rate a few favorites. CineMatch handles the picks.",
+    subtitle: "Rate a few favorites. FilmFlicker handles the picks.",
     primary: "Start matching",
     switchKicker: "Already have picks?",
     switchTitle: "Jump back into your movie queue.",
@@ -100,7 +101,10 @@ function AuthPage({ session, mode }: { session: Session | null; mode: AuthMode }
       </aside>
       <form className="auth-card" onSubmit={submit}>
         <BackButton fallback="/" />
-        <div className="auth-brand"><Clapperboard size={28} /> CineMatch</div>
+        <div className="auth-brand">
+          <span className="brand-mark"><BrandMark /></span>
+          <span>FilmFlicker</span>
+        </div>
         <p className="auth-kicker">{mode === "login" ? "Now showing" : "First picks"}</p>
         <h1>{copy.title}</h1>
         <p>{copy.subtitle}</p>

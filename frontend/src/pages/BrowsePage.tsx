@@ -2,10 +2,11 @@ import { Film, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CustomSelect } from "../components/CustomSelect";
 import { EmptyState } from "../components/EmptyState";
-import { Loading } from "../components/Loading";
 import { MovieCard } from "../components/MovieCard";
+import { MovieGridSkeleton } from "../components/MovieGridSkeleton";
 import { getGenres, getMovies, setRating, setWatched } from "../lib/api";
 import { errorMessage } from "../lib/errors";
+import { bumpTasteVersion } from "../lib/recommendationCache";
 import type { Movie, MoviePage } from "../lib/types";
 
 export function BrowsePage({ token }: { token: string }) {
@@ -80,6 +81,7 @@ export function BrowsePage({ token }: { token: string }) {
     setError(null);
     try {
       await setWatched(token, movie.movie_id, watched);
+      bumpTasteVersion(token);
       await updateMovie(movie, { watched, user_rating: watched ? movie.user_rating : null });
     } catch (err) {
       setError(errorMessage(err, "Unable to update watched state"));
@@ -93,6 +95,7 @@ export function BrowsePage({ token }: { token: string }) {
     setError(null);
     try {
       await setRating(token, movie.movie_id, rating);
+      bumpTasteVersion(token);
       await updateMovie(movie, { watched: true, user_rating: rating });
     } catch (err) {
       setError(errorMessage(err, "Unable to save rating"));
@@ -105,9 +108,14 @@ export function BrowsePage({ token }: { token: string }) {
     <div className="page">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Library</p>
-          <h1>Browse Movies</h1>
-          <p>Search, filter, save, and rate movies so the models learn your taste.</p>
+          <p className="eyebrow">Start here</p>
+          <h1>Feed Your Taste</h1>
+          <p>Mark what you have watched, drop a few ratings, then let <strong>For You</strong> turn that movie trail into sharper picks.</p>
+          <div className="header-meta">
+            <span>Add watched movies</span>
+            <span>Rate favorites fast</span>
+            <span>Wake up <strong>For You</strong></span>
+          </div>
         </div>
       </div>
       <div className="filter-bar" role="search">
@@ -115,7 +123,7 @@ export function BrowsePage({ token }: { token: string }) {
         <CustomSelect value={genre} options={genreOptions} ariaLabel="Filter by genre" onChange={(value) => { setGenre(value); setPage(1); }} />
         <CustomSelect value={sortBy} options={sortOptions} ariaLabel="Sort movies" onChange={(value) => { setSortBy(value); setPage(1); }} />
       </div>
-      {loading ? <Loading label="Loading movies" /> : null}
+      {loading ? <MovieGridSkeleton count={8} watched /> : null}
       {error ? <EmptyState icon={Film} title="Could not load movies" body={error} /> : null}
       {!loading && movies?.results.length === 0 ? <EmptyState icon={Film} title="No movies found" body="Try a broader search or another genre." /> : null}
       {!loading && !error ? <section className="movie-grid">

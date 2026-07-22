@@ -1,4 +1,4 @@
-"""Build the normalized CineMatch movie catalog.
+"""Build the normalized FilmFlicker movie catalog.
 
 Data roles:
 - MovieLens supplies ratings/tags/links and the stable training signal.

@@ -28,9 +28,18 @@ class WatchedIn(BaseModel):
     watched: bool
 
 
+class WatchlistIn(BaseModel):
+    watchlisted: bool
+
+
 class WatchedToggleOut(BaseModel):
     movie_id: int
     watched: bool
+
+
+class WatchlistToggleOut(BaseModel):
+    movie_id: int
+    watchlisted: bool
 
 
 class RecommendationOut(BaseModel):

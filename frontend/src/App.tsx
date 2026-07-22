@@ -14,6 +14,7 @@ const BrowsePage = lazy(() => import("./pages/BrowsePage").then((module) => ({ d
 const LandingPage = lazy(() => import("./pages/LandingPage").then((module) => ({ default: module.LandingPage })));
 const RecommendationsPage = lazy(() => import("./pages/RecommendationsPage").then((module) => ({ default: module.RecommendationsPage })));
 const SystemDesignPage = lazy(() => import("./pages/SystemDesignPage").then((module) => ({ default: module.SystemDesignPage })));
+const WatchlistPage = lazy(() => import("./pages/WatchlistPage").then((module) => ({ default: module.WatchlistPage })));
 const WatchedPage = lazy(() => import("./pages/WatchedPage").then((module) => ({ default: module.WatchedPage })));
 
 function RequireAuth({ session, children }: { session: Session | null; children: ReactNode }) {
@@ -57,8 +58,8 @@ export function App() {
         }
       })();
     }
-    window.addEventListener("cinematch:unauthorized", unauthorized);
-    return () => window.removeEventListener("cinematch:unauthorized", unauthorized);
+    window.addEventListener("filmflicker:unauthorized", unauthorized);
+    return () => window.removeEventListener("filmflicker:unauthorized", unauthorized);
   }, [navigate]);
 
   useEffect(() => {
@@ -94,13 +95,13 @@ export function App() {
     navigate("/");
   }
 
-  if (loading) return <Loading label="Opening CineMatch" />;
+  if (loading) return <Loading label="Opening FilmFlicker" />;
 
   const token = session?.access_token ?? "";
   const email = session?.user.email ?? "Signed in";
 
   return (
-    <Suspense fallback={<Loading label="Loading page" />}>
+    <Suspense fallback={null}>
     <Routes>
       <Route path="/" element={session ? <Navigate to="/app/browse" replace /> : <LandingPage />} />
       <Route path="/auth" element={<Navigate to={session ? "/app/browse" : "/signin"} replace />} />
@@ -118,6 +119,7 @@ export function App() {
         <Route index element={<Navigate to="/app/browse" replace />} />
         <Route path="browse" element={<BrowsePage token={token} />} />
         <Route path="recommendations" element={<RecommendationsPage token={token} />} />
+        <Route path="watchlist" element={<WatchlistPage token={token} />} />
         <Route path="watched" element={<WatchedPage token={token} />} />
         <Route path="analytics" element={<AnalyticsPage token={token} />} />
       </Route>

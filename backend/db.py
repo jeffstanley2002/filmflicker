@@ -60,6 +60,10 @@ def toggle_watched(engine: Engine, user_id: str, movie_id: int) -> bool:
             text("INSERT INTO cinematch_v2.watched (user_id, movie_id) VALUES (:uid, :mid)"),
             {"uid": user_id, "mid": movie_id},
         )
+        conn.execute(
+            text("DELETE FROM cinematch_v2.watchlist WHERE user_id = :uid AND movie_id = :mid"),
+            {"uid": user_id, "mid": movie_id},
+        )
         return True
 
 
@@ -76,6 +80,10 @@ def set_watched(engine: Engine, user_id: str, movie_id: int, watched: bool) -> b
             )
             conn.execute(
                 text("DELETE FROM cinematch_v2.not_interested WHERE user_id = :uid AND movie_id = :mid"),
+                {"uid": user_id, "mid": movie_id},
+            )
+            conn.execute(
+                text("DELETE FROM cinematch_v2.watchlist WHERE user_id = :uid AND movie_id = :mid"),
                 {"uid": user_id, "mid": movie_id},
             )
             return True
@@ -133,6 +141,10 @@ def set_rating(engine: Engine, user_id: str, movie_id: int, rating: float):
         )
         conn.execute(
             text("DELETE FROM cinematch_v2.not_interested WHERE user_id = :uid AND movie_id = :mid"),
+            {"uid": user_id, "mid": movie_id},
+        )
+        conn.execute(
+            text("DELETE FROM cinematch_v2.watchlist WHERE user_id = :uid AND movie_id = :mid"),
             {"uid": user_id, "mid": movie_id},
         )
         # Rating something implies watched.
@@ -196,6 +208,57 @@ def get_not_interested_ids(engine: Engine, user_id: str) -> set:
     return {row[0] for row in rows}
 
 
+def get_watchlist_ids(engine: Engine, user_id: str) -> set:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT movie_id FROM cinematch_v2.watchlist WHERE user_id = :uid"),
+            {"uid": user_id},
+        ).fetchall()
+    return {row[0] for row in rows}
+
+
+def get_watchlist_page(engine: Engine, user_id: str, page: int, page_size: int) -> tuple[int, list[int]]:
+    offset = (page - 1) * page_size
+    with engine.connect() as conn:
+        total = conn.execute(
+            text("SELECT count(*) FROM cinematch_v2.watchlist WHERE user_id = :uid"),
+            {"uid": user_id},
+        ).scalar_one()
+        rows = conn.execute(
+            text(
+                """SELECT movie_id
+                   FROM cinematch_v2.watchlist
+                   WHERE user_id = :uid
+                   ORDER BY added_at DESC, movie_id
+                   LIMIT :limit OFFSET :offset"""
+            ),
+            {"uid": user_id, "limit": page_size, "offset": offset},
+        ).fetchall()
+    return int(total), [row[0] for row in rows]
+
+
+def set_watchlist(engine: Engine, user_id: str, movie_id: int, value: bool) -> bool:
+    with engine.begin() as conn:
+        if value:
+            conn.execute(
+                text("DELETE FROM cinematch_v2.not_interested WHERE user_id = :uid AND movie_id = :mid"),
+                {"uid": user_id, "mid": movie_id},
+            )
+            conn.execute(
+                text(
+                    """INSERT INTO cinematch_v2.watchlist (user_id, movie_id)
+                       VALUES (:uid, :mid) ON CONFLICT (user_id, movie_id) DO NOTHING"""
+                ),
+                {"uid": user_id, "mid": movie_id},
+            )
+        else:
+            conn.execute(
+                text("DELETE FROM cinematch_v2.watchlist WHERE user_id = :uid AND movie_id = :mid"),
+                {"uid": user_id, "mid": movie_id},
+            )
+    return value
+
+
 def set_not_interested(engine: Engine, user_id: str, movie_id: int, value: bool) -> bool:
     with engine.begin() as conn:
         if value:
@@ -205,6 +268,10 @@ def set_not_interested(engine: Engine, user_id: str, movie_id: int, value: bool)
             )
             conn.execute(
                 text("DELETE FROM cinematch_v2.watched WHERE user_id = :uid AND movie_id = :mid"),
+                {"uid": user_id, "mid": movie_id},
+            )
+            conn.execute(
+                text("DELETE FROM cinematch_v2.watchlist WHERE user_id = :uid AND movie_id = :mid"),
                 {"uid": user_id, "mid": movie_id},
             )
             conn.execute(

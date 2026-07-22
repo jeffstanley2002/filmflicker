@@ -1,28 +1,65 @@
-import { Radar, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { Database, Radar, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { EmptyState } from "../components/EmptyState";
-import { Loading } from "../components/Loading";
 import { ModelSelector } from "../components/ModelSelector";
 import { MovieCard } from "../components/MovieCard";
+import { MovieGridSkeleton } from "../components/MovieGridSkeleton";
 import { MODEL_COPY } from "../lib/models";
-import { getRecommendations, setNotInterested, setWatched } from "../lib/api";
+import { getRecommendations, setNotInterested, setWatchlist } from "../lib/api";
 import { errorMessage } from "../lib/errors";
-import { useAsync } from "../lib/useAsync";
+import { readCachedRecommendations, writeCachedRecommendations } from "../lib/recommendationCache";
 import type { ModelKey, Recommendation } from "../lib/types";
+
+const RECOMMENDATION_LIMIT = 12;
 
 export function RecommendationsPage({ token }: { token: string }) {
   const [model, setModel] = useState<ModelKey>("collaborative");
-  const { data, loading, error, setData } = useAsync((signal) => getRecommendations(token, model, 12, signal), [token, model]);
+  const [data, setData] = useState<Recommendation[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fromCache, setFromCache] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  async function markWatched(movie: Recommendation) {
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const cached = readCachedRecommendations(token, model, RECOMMENDATION_LIMIT);
+
+    setError(null);
+    setActionError(null);
+    setFromCache(Boolean(cached));
+    setData(cached?.items ?? null);
+    setLoading(!cached);
+
+    if (cached) return () => controller.abort();
+
+    getRecommendations(token, model, RECOMMENDATION_LIMIT, controller.signal)
+      .then((items) => {
+        if (controller.signal.aborted) return;
+        writeCachedRecommendations(token, model, RECOMMENDATION_LIMIT, items);
+        setData(items);
+        setFromCache(false);
+      })
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) setError(errorMessage(err, "Unable to load recommendations"));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [model, token]);
+
+  async function saveToWatchlist(movie: Recommendation) {
     setBusyId(movie.movie_id);
     setActionError(null);
     try {
-      await setWatched(token, movie.movie_id, true);
-      setData((current) => current?.filter((item) => item.movie_id !== movie.movie_id) ?? null);
+      await setWatchlist(token, movie.movie_id, true);
+      const next = data?.filter((item) => item.movie_id !== movie.movie_id) ?? [];
+      setData(next);
+      writeCachedRecommendations(token, model, RECOMMENDATION_LIMIT, next);
     } catch (err) {
-      setActionError(errorMessage(err, "Unable to save movie"));
+      setActionError(errorMessage(err, "Unable to add movie to your watchlist"));
     } finally {
       setBusyId(null);
     }
@@ -34,6 +71,7 @@ export function RecommendationsPage({ token }: { token: string }) {
     try {
       await setNotInterested(token, movie.movie_id);
       setData((current) => current?.filter((item) => item.movie_id !== movie.movie_id) ?? null);
+      writeCachedRecommendations(token, model, RECOMMENDATION_LIMIT, data?.filter((item) => item.movie_id !== movie.movie_id) ?? []);
     } catch (err) {
       setActionError(errorMessage(err, "Unable to update your taste feedback"));
     } finally {
@@ -48,16 +86,22 @@ export function RecommendationsPage({ token }: { token: string }) {
           <p className="eyebrow">Recommendation studio</p>
           <h1>For You</h1>
           <p>{MODEL_COPY[model].detail}</p>
+          <div className="header-meta">
+            <span>Top {RECOMMENDATION_LIMIT} per model</span>
+            <span>Save sparks to Watchlist</span>
+            <span>Refreshes after ratings or Watched changes</span>
+          </div>
         </div>
       </div>
       <ModelSelector value={model} onChange={setModel} />
-      {loading ? <Loading label="Scoring movies" /> : null}
+      {fromCache && !loading ? <div className="cache-note"><Database size={16} /> Same taste, same treasure map. Using your saved picks.</div> : null}
+      {loading ? <MovieGridSkeleton count={RECOMMENDATION_LIMIT} withDismiss /> : null}
       {error ? <EmptyState icon={Radar} title="Could not load recommendations" body={error} /> : null}
       {actionError ? <div className="inline-error">{actionError}</div> : null}
-      {!loading && data?.length === 0 ? <EmptyState icon={Sparkles} title="No recommendations yet" body="Rate a few more movies or try Crowd favorites." /> : null}
+      {!loading && data?.length === 0 ? <EmptyState icon={Sparkles} title="No picks yet" body="Toss a few ratings into Taste Builder, then come back for the good stuff." /> : null}
       {!loading && !error ? <section className="movie-grid">
         {data?.map((movie) => (
-          <MovieCard key={movie.movie_id} movie={movie} busy={busyId === movie.movie_id} onWatch={() => markWatched(movie)} onDismiss={() => dismiss(movie)} />
+          <MovieCard key={movie.movie_id} movie={movie} busy={busyId === movie.movie_id} onWatch={() => saveToWatchlist(movie)} watchTitle="Add to watchlist" onDismiss={() => dismiss(movie)} />
         ))}
       </section> : null}
     </div>

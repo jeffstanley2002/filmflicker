@@ -13,7 +13,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("CineMatch render failure", error, info);
+    console.error("FilmFlicker render failure", error, info);
   }
 
   render() {
@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <main className="fatal-error" role="alert">
         <AlertTriangle size={30} />
-        <h1>CineMatch could not open this view</h1>
+        <h1>FilmFlicker could not open this view</h1>
         <p>Refresh the app to reconnect and try again.</p>
         <button className="primary-button" type="button" onClick={() => window.location.reload()}>
           <RefreshCw size={17} /> Refresh

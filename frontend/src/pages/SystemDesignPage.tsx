@@ -1,34 +1,111 @@
-import { ArrowRight, Brain, Database, Film, GitBranch, LockKeyhole, Server, Sparkles, Star, Workflow } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  BarChart3,
+  Boxes,
+  Database,
+  Fingerprint,
+  Layers3,
+  LockKeyhole,
+  Network,
+  Radar,
+  Server,
+  ShieldCheck,
+  Sparkles,
+  Workflow,
+  Zap,
+} from "lucide-react";
 import { Link } from "react-router-dom";
+import { BrandMark } from "../components/BrandMark";
 
-const pipeline = [
-  ["Collect", "Movies, ratings, genres, posters."],
-  ["Train", "Five recommenders compete."],
-  ["Serve", "FastAPI returns picks fast."],
-  ["Protect", "Supabase keeps taste private."],
-  ["Delight", "React makes it feel instant."],
+const modelStack = [
+  {
+    icon: Radar,
+    name: "Collaborative hybrid",
+    role: "Main ranking engine",
+    metric: "12.2%",
+    label: "Top-10 test",
+    strength: "Best launch personalizer",
+    detail: "Learns patterns from similar movie fans and drives the strongest launch picks.",
+    meaning: "Strict offline test result: this was the strongest personalized ranker for surfacing future-liked movies near the top.",
+  },
+  {
+    icon: Fingerprint,
+    name: "Latent taste embeddings",
+    role: "Taste fingerprint",
+    metric: "0.932",
+    label: "Rating error",
+    strength: "Fast taste matching",
+    detail: "Turns a viewer profile into a compact preference map for fast matching.",
+    meaning: "Strict offline test result: this model gives a compact taste fingerprint that is accurate enough for fast matching.",
+  },
+  {
+    icon: Layers3,
+    name: "Content TF-IDF",
+    role: "Similarity model",
+    metric: "11.3%",
+    label: "Top-10 test",
+    strength: "Strong for new profiles",
+    detail: "Connects films by genres, tags, and catalog signals so early recommendations still make sense.",
+    meaning: "Strict offline test result: this model stays useful when a user has only a small taste profile.",
+  },
+  {
+    icon: Network,
+    name: "Taste neighborhoods",
+    role: "Discovery lanes",
+    metric: "12.8",
+    label: "Novelty score",
+    strength: "Better discovery range",
+    detail: "Groups viewers into taste neighborhoods to widen discovery without getting random.",
+    meaning: "Strict offline test result: this model increases discovery by reaching beyond the most obvious popular picks.",
+  },
+  {
+    icon: BarChart3,
+    name: "Popularity baseline",
+    role: "Reliable fallback",
+    metric: "69.6%",
+    label: "Variety score",
+    strength: "Safe fallback layer",
+    detail: "Keeps the app useful for brand-new profiles and model edge cases.",
+    meaning: "Strict offline test result: this baseline keeps recommendations broad enough for cold starts and fallback paths.",
+  },
 ];
 
-const capabilities = [
+const architectureFlow = [
+  ["MovieLens 32M", "Movies, tags, links, and 32,000,204 ratings."],
+  ["Train and test", "Models compete on time-based user history."],
+  ["Artifact vault", "Checked model files load once at API startup."],
+  ["FastAPI", "Scores, filters, explains, and saves feedback."],
+  ["React app", "Turns the model stack into a clear product loop."],
+];
+
+const releaseState = [
+  ["Dataset", "MovieLens 32M catalog through 2023."],
+  ["Testing", "Checked against 1,000 real user histories."],
+  ["Export", "Checksum manifest: July 16, 2026."],
+  ["Runtime", "Cached models, single API worker, deploy-ready."],
+];
+
+const systemPlanes = [
   {
-    icon: Brain,
-    title: "Machine learning depth",
-    body: "Popularity, TF-IDF similarity, SVD collaborative filtering, KMeans neighborhoods, and latent taste embeddings run side by side with chronological ranking tests.",
+    icon: Database,
+    title: "Data plane",
+    copy: "Catalog files train the models. Supabase stores each user's ratings, watched list, watchlist, and feedback.",
   },
   {
     icon: Server,
-    title: "Backend production shape",
-    body: "FastAPI routers expose typed contracts, validate inputs, cache expensive model artifacts, and keep idempotent watched/rating APIs for reliable UI state.",
+    title: "Serving plane",
+    copy: "FastAPI loads the trained artifacts once, then serves browsing, recommendations, analytics, and health checks.",
   },
   {
     icon: LockKeyhole,
-    title: "Security model",
-    body: "Supabase handles signup and session refresh. The API only accepts verified bearer tokens and uses the JWT subject as the database tenant boundary.",
+    title: "Trust plane",
+    copy: "Supabase auth scopes every request to the signed-in user, with database policies as a second guard.",
   },
   {
-    icon: Database,
-    title: "Database clarity",
-    body: "A dedicated cinematch_v2 schema separates React-era user data from older prototypes, with uniqueness constraints and cascading deletes from Supabase auth.users.",
+    icon: BadgeCheck,
+    title: "Release plane",
+    copy: "The launch build ships only after metrics, checksums, export validation, API readiness, and frontend checks pass.",
   },
 ];
 
@@ -37,100 +114,141 @@ export function SystemDesignPage() {
     <div className="system-page">
       <header className="topbar">
         <Link to="/" className="brand">
-          <span className="brand-mark"><GitBranch size={22} /></span>
-          <span>CineMatch</span>
+          <span className="brand-mark"><BrandMark /></span>
+          <span>FilmFlicker</span>
         </Link>
         <nav>
-          <Link to="/signin" className="nav-cta">Open app</Link>
+          <Link to="/signin">Sign in</Link>
+          <Link to="/register" className="nav-cta">Open app</Link>
         </nav>
       </header>
 
       <main className="page system-main">
         <section className="system-hero">
-          <div>
-            <p className="eyebrow">Architecture tour</p>
-            <h1>A recommendation engine you can actually see.</h1>
-            <p>Follow one rating as it becomes a smarter movie pick.</p>
+          <div className="system-hero-copy">
+            <p className="eyebrow">Initial release architecture</p>
+            <h1>Five trained movie models. One launch-ready system.</h1>
+            <p>
+              FilmFlicker combines trained recommendation models, authenticated user feedback, and a fast React app into
+              one explainable release.
+            </p>
+            <div className="hero-actions">
+              <Link className="primary-button" to="/signin">Try the release <ArrowRight size={18} /></Link>
+              <Link className="secondary-button" to="/">Back to overview</Link>
+            </div>
           </div>
-          <Link className="primary-button" to="/signin">Open app <ArrowRight size={18} /></Link>
-        </section>
-
-        <section className="architecture-orbit" aria-label="CineMatch architecture illustration">
-          <div className="orbit-core">
-            <Sparkles size={34} />
-            <strong>CineMatch</strong>
-            <span>taste in, movies out</span>
+          <div className="system-status-card" aria-label="Current system state">
+            <span><ShieldCheck size={16} /> Launch state</span>
+            <strong>Validated models are ready for the first public build.</strong>
+            <dl>
+              <div>
+                <dt>Strategies</dt>
+                <dd>5</dd>
+              </div>
+              <div>
+                <dt>Ratings</dt>
+                <dd>32M</dd>
+              </div>
+              <div>
+                <dt>Tested users</dt>
+                <dd>1K</dd>
+              </div>
+            </dl>
           </div>
-          <article>
-            <Film size={24} />
-            <strong>Catalog</strong>
-            <span>movie signals</span>
-          </article>
-          <article>
-            <Brain size={24} />
-            <strong>Models</strong>
-            <span>ranking brain</span>
-          </article>
-          <article>
-            <Server size={24} />
-            <strong>API</strong>
-            <span>quick answers</span>
-          </article>
-          <article>
-            <Sparkles size={24} />
-            <strong>App</strong>
-            <span>fun feedback</span>
-          </article>
         </section>
 
-        <section className="decision-grid">
-          <article>
-            <strong>Current catalog</strong>
-            <span>MovieLens 32M trained artifacts with catalog coverage through 2023.</span>
-          </article>
-          <article>
-            <strong>Fresh releases</strong>
-            <span>Add a modern catalog source first, then retrain/export before showing them in personalized recommendations.</span>
-          </article>
-          <article>
-            <strong>Production rule</strong>
-            <span>No model ships without metrics.json, artifact checks, and API health verification.</span>
-          </article>
+        <section className="model-showcase" aria-labelledby="model-showcase-title">
+          <div className="model-intro">
+            <div>
+              <p className="eyebrow">Model core</p>
+              <h2 id="model-showcase-title">A trained model stack, not a single ranking trick.</h2>
+              <p>Five recommendation strategies work together so the first release feels personal, explainable, and steady from the first rating.</p>
+            </div>
+            <div className="model-proof-strip" aria-label="Model stack highlights">
+              <span><strong>5</strong> model strategies</span>
+              <span><strong>32M</strong> training ratings</span>
+              <span><strong>1K</strong> tested users</span>
+            </div>
+          </div>
+          <div className="model-showcase-grid">
+            {modelStack.map(({ icon: Icon, name, role, metric, label, strength, detail, meaning }) => (
+              <article key={name} tabIndex={0}>
+                <div className="model-card-top">
+                  <span><Icon size={20} /></span>
+                  <small>{role}</small>
+                </div>
+                <h3>{name}</h3>
+                <p>{detail}</p>
+                <div className="model-metric">
+                  <strong>{strength}</strong>
+                  <span>Tested metric: {metric} {label}</span>
+                  <small>{meaning}</small>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
 
-        <section className="pipeline">
-          {pipeline.map(([title, body], index) => (
+        <section className="system-flow" aria-labelledby="system-flow-title">
+          <div className="flow-intro">
+            <p className="eyebrow">End-to-end architecture</p>
+            <h2 id="system-flow-title">How a rating becomes a recommendation.</h2>
+            <p>Clean data becomes trained artifacts, then the API turns those artifacts into ranked movies the app can explain.</p>
+          </div>
+          <div className="flow-rail">
+            {architectureFlow.map(([title, copy], index) => (
+              <article key={title}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <h3>{title}</h3>
+                  <p>{copy}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="release-grid" aria-label="Current release state">
+          {releaseState.map(([title, body]) => (
             <article key={title}>
-              <span>{index + 1}</span>
-              <h2>{title}</h2>
-              <p>{body}</p>
+              <strong>{title}</strong>
+              <span>{body}</span>
             </article>
           ))}
         </section>
 
-        <section className="capability-grid">
-          {capabilities.map(({ icon: Icon, title, body }) => (
-            <article key={title}>
-              <Icon size={24} />
-              <h2>{title}</h2>
-              <p>{body}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="review-panel">
-          <Workflow size={26} />
-          <div>
-            <h2>How the loop feels</h2>
-            <p>Users browse and rate movies, the API stores private taste signals, and the recommender refreshes picks with explanations that make each model approachable.</p>
+        <section className="system-planes" aria-labelledby="system-planes-title">
+          <div className="section-title">
+            <div>
+              <p className="eyebrow">System planes</p>
+              <h2 id="system-planes-title">Production shape around the models.</h2>
+            </div>
+          </div>
+          <div className="system-plane-grid">
+            {systemPlanes.map(({ icon: Icon, title, copy }) => (
+              <article key={title}>
+                <Icon size={24} />
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </article>
+            ))}
           </div>
         </section>
 
-        <section className="review-panel">
-          <Star size={26} />
+        <section className="launch-readiness">
           <div>
-            <h2>Why it stays trustworthy</h2>
-            <p>New catalog data is added before retraining, metrics are checked before release, and the app only shows model outputs that the API can explain.</p>
+            <p className="eyebrow">What initial release means</p>
+            <h2>Ready now, with clear boundaries.</h2>
+            <p>
+              The first release is trained and validated on the current catalog. Newer movies can be added through the
+              next catalog refresh, retraining pass, and export check.
+            </p>
+          </div>
+          <div className="readiness-stack" aria-label="Release verification">
+            <span><Workflow size={18} /> time-based testing</span>
+            <span><Boxes size={18} /> artifact checksums</span>
+            <span><Zap size={18} /> cached model serving</span>
+            <span><Sparkles size={18} /> explainable product loop</span>
           </div>
         </section>
       </main>
