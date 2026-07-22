@@ -14,9 +14,9 @@ from backend import data as data_module
 from backend import db
 from backend.auth import get_current_user_id
 from backend.config import get_settings
-from backend.routers import analytics, feedback, metrics, movies, posters, ratings, recommendations, watched
+from backend.routers import analytics, feedback, metrics, movies, posters, ratings, recommendations, watched, watchlist
 
-logger = logging.getLogger("cinematch.api")
+logger = logging.getLogger("filmflicker.api")
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 
 
@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="CineMatch API", version="1.1.0", lifespan=lifespan)
+app = FastAPI(title="FilmFlicker API", version="1.1.0", lifespan=lifespan)
 
 _allowed_origins = list(get_settings().allowed_origins)
 app.add_middleware(
@@ -50,6 +50,7 @@ app.include_router(movies.router)
 app.include_router(posters.router)
 app.include_router(feedback.router)
 app.include_router(watched.router)
+app.include_router(watchlist.router)
 app.include_router(ratings.router)
 app.include_router(recommendations.router)
 app.include_router(analytics.router)

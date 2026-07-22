@@ -1,13 +1,14 @@
-import { ArrowRight, BarChart3, Brain, Clapperboard, ShieldCheck, Sparkles, UserPlus } from "lucide-react";
+import { ArrowRight, BarChart3, Brain, ShieldCheck, Sparkles, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
+import { BrandMark } from "../components/BrandMark";
 
 export function LandingPage() {
   return (
     <div className="landing">
       <header className="topbar">
         <Link to="/" className="brand">
-          <span className="brand-mark"><Clapperboard size={22} /></span>
-          <span>CineMatch</span>
+          <span className="brand-mark"><BrandMark /></span>
+          <span>FilmFlicker</span>
         </Link>
         <nav>
           <Link to="/signin" className="nav-cta">Sign in</Link>
@@ -21,7 +22,7 @@ export function LandingPage() {
       <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow">Personal movie intelligence</p>
-          <h1>CineMatch</h1>
+          <h1>FilmFlicker</h1>
           <p>
             A polished recommendation studio that compares five model strategies, learns from your ratings,
             and explains every pick in human language.

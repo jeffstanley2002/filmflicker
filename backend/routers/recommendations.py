@@ -26,6 +26,7 @@ def get_recommendations(
     engine = db.get_connection()
     watched_ids, rated = db.get_profile(engine, user_id)
     disliked_ids = db.get_not_interested_ids(engine, user_id)
+    watchlist_ids = db.get_watchlist_ids(engine, user_id)
     low_signal = data_module.low_signal()
     pop_df = data_module.popularity_table()
     movies_df = data_module.movies_indexed()
@@ -43,7 +44,7 @@ def get_recommendations(
         n=n,
         rated=rated,
         watched_ids=watched_ids,
-        disliked_ids=disliked_ids,
+        disliked_ids=disliked_ids | watchlist_ids,
         movies_df=movies_df,
         pop_df=pop_df,
         low_signal=low_signal,

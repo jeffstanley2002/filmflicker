@@ -5,12 +5,13 @@ import { useModalFocus } from "../lib/useModalFocus";
 
 type Props = {
   movie: Movie | Recommendation | null;
+  requireRating?: boolean;
   busy?: boolean;
   onClose: () => void;
   onConfirm: (rating: number | null) => void;
 };
 
-export function RatingDialog({ movie, busy = false, onClose, onConfirm }: Props) {
+export function RatingDialog({ movie, requireRating = false, busy = false, onClose, onConfirm }: Props) {
   const [rating, setRating] = useState<number | null>(4);
   const dialogRef = useRef<HTMLElement>(null);
   const titleId = useId();
@@ -28,7 +29,9 @@ export function RatingDialog({ movie, busy = false, onClose, onConfirm }: Props)
         </button>
         <p className="eyebrow">Add to watched</p>
         <h2 id={titleId}>{movie.title}</h2>
-        <p id={descriptionId} className="dialog-subtitle">Rate it now to improve your recommendations immediately, or add it without a rating.</p>
+        <p id={descriptionId} className="dialog-subtitle">
+          {requireRating ? "Choose a rating to add this movie to watched and improve your next recommendations." : "Rate it now to improve your recommendations immediately, or add it without a rating."}
+        </p>
         <div className="dialog-stars" role="radiogroup" aria-label="Select rating">
           {[1, 2, 3, 4, 5].map((value) => (
             <button key={value} type="button" role="radio" aria-checked={rating === value} className={rating && rating >= value ? "dialog-star active" : "dialog-star"} onClick={() => setRating(value)} title={`${value} stars`}>
@@ -37,9 +40,9 @@ export function RatingDialog({ movie, busy = false, onClose, onConfirm }: Props)
           ))}
         </div>
         <div className="dialog-actions">
-          <button className="secondary-button" type="button" disabled={busy} onClick={() => onConfirm(null)}>
+          {!requireRating ? <button className="secondary-button" type="button" disabled={busy} onClick={() => onConfirm(null)}>
             Add without rating
-          </button>
+          </button> : null}
           <button className="primary-button" type="button" disabled={busy || !rating} onClick={() => onConfirm(rating)}>
             <Check size={18} /> Save watched
           </button>

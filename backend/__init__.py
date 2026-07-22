@@ -1,1 +1,1 @@
-"""CineMatch FastAPI application package."""
+"""FilmFlicker FastAPI application package."""

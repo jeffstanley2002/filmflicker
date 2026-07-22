@@ -1,8 +1,8 @@
-# CineMatch Model Training and Evaluation Report
+# FilmFlicker Model Training and Evaluation Report
 
 ## Document purpose
 
-This document is the permanent technical record of the CineMatch recommendation models, last rebuilt and evaluated on July 16, 2026. It explains the process from raw data preparation through production artifact validation.
+This document is the permanent technical record of the FilmFlicker recommendation models, last rebuilt and evaluated on July 16, 2026. It explains the process from raw data preparation through production artifact validation.
 
 It is intended to answer all of the following without requiring the reader to reverse-engineer the code:
 
@@ -10,7 +10,7 @@ It is intended to answer all of the following without requiring the reader to re
 - How was the data represented?
 - What does each recommender actually do?
 - Which parts are trained and which parts are rule-based?
-- How are new CineMatch users handled when they do not exist in MovieLens?
+- How are new FilmFlicker users handled when they do not exist in MovieLens?
 - How were data leakage and test-set tuning prevented?
 - Which parameters were tested?
 - Why was the final configuration selected?
@@ -28,7 +28,7 @@ The source-of-truth machine-readable outputs are:
 
 ## Executive summary
 
-CineMatch contains five recommendation strategies:
+FilmFlicker contains five recommendation strategies:
 
 1. Bayesian popularity
 2. TF-IDF content matching
@@ -87,7 +87,7 @@ The production training pipeline reads:
 - `data/processed/tags.csv`
 - `data/processed/links.csv`
 
-The environment variable `CINEMATCH_DATA_DIR` can override this location. If no override is provided, the code prefers `data/processed` when a processed movie catalog exists and otherwise falls back to `data/ml-latest-small`.
+The environment variable `FILMFLICKER_DATA_DIR` can override this location. If no override is provided, the code prefers `data/processed` when a processed movie catalog exists and otherwise falls back to `data/ml-latest-small`.
 
 ### 1.2 Rating data types
 
@@ -391,7 +391,7 @@ Final settings:
 
 ### 5.5 New-user fold-in
 
-CineMatch users are not MovieLens training users. The production system therefore does not look up a stored MovieLens user vector. It solves a regularized least-squares fold-in problem from the new profile.
+FilmFlicker users are not MovieLens training users. The production system therefore does not look up a stored MovieLens user vector. It solves a regularized least-squares fold-in problem from the new profile.
 
 First, the profile baseline is shrunk toward the global mean:
 
@@ -418,7 +418,7 @@ Predictions are clipped to the valid 0.5 to 5.0 rating range.
 | Profile baseline strength | 5.0 | 3.0 |
 | Movie-bias strength | 25.0 | 25.0 |
 
-The final model is more expressive and more responsive to a small CineMatch profile, while still retaining regularized user and movie baselines.
+The final model is more expressive and more responsive to a small FilmFlicker profile, while still retaining regularized user and movie baselines.
 
 ### 5.7 Artifact
 
@@ -788,7 +788,7 @@ The selected 64-factor artifact was evaluated with four serving-time fold-in/pro
 
 Winner: responsive fold-in with regularization 0.15 and baseline strength 3.0.
 
-The winner improved NDCG, Hit Rate, MRR, and coverage, indicating that CineMatch's small new-user profiles benefited from less aggressive shrinkage.
+The winner improved NDCG, Hit Rate, MRR, and coverage, indicating that FilmFlicker's small new-user profiles benefited from less aggressive shrinkage.
 
 ### 11.4 Round 3: reranking weights
 
@@ -912,7 +912,7 @@ A 2025 MovieLens 1M baseline study reported approximately 0.8757 RMSE for SVD an
 
 - `Evaluating Recommender System using Baseline Approaches`: https://doi.org/10.1016/j.procs.2025.04.495
 
-CineMatch's 0.9071 is somewhat higher, but the figures are not directly comparable because CineMatch uses MovieLens 32M sampling and chronological per-user holdout rather than that study's exact data/protocol.
+FilmFlicker's 0.9071 is somewhat higher, but the figures are not directly comparable because FilmFlicker uses MovieLens 32M sampling and chronological per-user holdout rather than that study's exact data/protocol.
 
 The serving architecture is consistent with the standard candidate-generation, scoring, and reranking pattern described by Google:
 
@@ -924,7 +924,7 @@ Commercial systems such as Netflix combine offline experimentation with live A/B
 
 Therefore, the correct claim is:
 
-- CineMatch has a reproducibly evaluated, deployment-ready portfolio recommender.
+- FilmFlicker has a reproducibly evaluated, deployment-ready portfolio recommender.
 - Its collaborative hybrid has the strongest ranking point estimates among the included serving strategies under the documented offline protocol.
 - Its advantage over the previous collaborative configuration is not statistically conclusive in the paired 1,000-user test.
 - It has not been validated for commercial engagement or retention because it has no meaningful live traffic.
@@ -1052,7 +1052,7 @@ Why:
 - Best RMSE and MAE.
 - Best Precision@10, Recall@10, Hit Rate@10, and NDCG@10.
 - Strong 78.84% diversity.
-- Personalized fold-in works for new CineMatch users.
+- Personalized fold-in works for new FilmFlicker users.
 
 ### 17.2 Content-based
 
@@ -1259,7 +1259,7 @@ If meaningful user traffic is ever available, add online metrics before making f
 
 ## 21. Final statement
 
-CineMatch's model system is complete for its intended portfolio deployment. It has:
+FilmFlicker's model system is complete for its intended portfolio deployment. It has:
 
 - Multiple complementary candidate generators
 - Signed positive and negative feedback
@@ -1274,6 +1274,6 @@ CineMatch's model system is complete for its intended portfolio deployment. It h
 
 The strongest defensible claim is:
 
-> CineMatch is a production-style hybrid movie recommendation system trained on MovieLens 32M. Its 64-factor collaborative hybrid was selected through chronological validation and achieved 0.907 RMSE, 0.678 MAE, 12.2% Hit Rate@10, 3.08% NDCG@10, and 78.8% intra-list diversity on 1,000 untouched user histories.
+> FilmFlicker is a production-style hybrid movie recommendation system trained on MovieLens 32M. Its 64-factor collaborative hybrid was selected through chronological validation and achieved 0.907 RMSE, 0.678 MAE, 12.2% Hit Rate@10, 3.08% NDCG@10, and 78.8% intra-list diversity on 1,000 untouched user histories.
 
 It should not be described as commercially validated without real-user online experiments.

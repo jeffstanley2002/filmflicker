@@ -1,6 +1,7 @@
-import { BarChart3, ChevronLeft, ChevronRight, Film, Heart, LogOut, Radar, Search, Sparkles } from "lucide-react";
+import { Award, BarChart3, Bookmark, ChevronLeft, ChevronRight, Heart, LogOut, Radar, Search, Sparkles, Tags, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { BrandMark } from "./BrandMark";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { getAnalytics } from "../lib/api";
 import { errorMessage } from "../lib/errors";
@@ -56,16 +57,23 @@ export function AppShell({ email, token, onSignOut }: { email: string; token: st
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    getAnalytics(token, controller.signal)
+    const loadAnalytics = () => getAnalytics(token, controller.signal)
       .then((nextAnalytics) => {
         if (active) setAnalytics(nextAnalytics);
       })
       .catch(() => {
         if (active && !controller.signal.aborted) setAnalytics(null);
       });
+    const refreshAnalytics = () => {
+      void loadAnalytics();
+    };
+
+    void loadAnalytics();
+    window.addEventListener("filmflicker:taste-changed", refreshAnalytics);
     return () => {
       active = false;
       controller.abort();
+      window.removeEventListener("filmflicker:taste-changed", refreshAnalytics);
     };
   }, [token]);
 
@@ -88,36 +96,42 @@ export function AppShell({ email, token, onSignOut }: { email: string; token: st
           {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
         </button>
         <NavLink to="/app/browse" className="brand">
-          <span className="brand-mark"><Film size={22} /></span>
-          <span>CineMatch</span>
+          <span className="brand-mark"><BrandMark /></span>
+          <span>FilmFlicker</span>
         </NavLink>
         <nav>
-          <NavLink to="/app/browse"><Search size={18} /><span>Browse</span></NavLink>
+          <NavLink to="/app/browse"><Search size={18} /><span>Taste Builder</span></NavLink>
           <NavLink to="/app/recommendations"><Radar size={18} /><span>For You</span></NavLink>
+          <NavLink to="/app/watchlist"><Bookmark size={18} /><span>Watchlist</span></NavLink>
           <NavLink to="/app/watched"><Heart size={18} /><span>Watched</span></NavLink>
           <NavLink to="/app/analytics"><BarChart3 size={18} /><span>Taste</span></NavLink>
         </nav>
         <div className="sidebar-user">
-          <div className="profile-card" tabIndex={0} aria-describedby="taste-badge-popover">
+          <div className="profile-card" tabIndex={0} aria-describedby="taste-badge-popover" aria-label="Taste badge">
             <div className="profile-avatar"><Sparkles size={16} /></div>
             <div className="profile-copy">
               <strong>{name}</strong>
               <span>{badge.label}</span>
             </div>
             <div className="profile-popover" id="taste-badge-popover" role="tooltip">
-              <strong>Why this badge?</strong>
-              <p>{badge.reason}</p>
+              <div className="badge-popover-heading">
+                <span><Award size={16} /></span>
+                <div>
+                  <strong>{badge.label}</strong>
+                  <p>{badge.reason}</p>
+                </div>
+              </div>
               <dl>
                 <div>
-                  <dt>Top tastes</dt>
+                  <dt><Tags size={13} /> Top tastes</dt>
                   <dd>{badge.genres.join(", ")}</dd>
                 </div>
                 <div>
-                  <dt>Discovery style</dt>
+                  <dt><Sparkles size={13} /> Discovery style</dt>
                   <dd>{badge.clusters.join(", ")}</dd>
                 </div>
                 <div>
-                  <dt>Profile signal</dt>
+                  <dt><TrendingUp size={13} /> Profile signal</dt>
                   <dd>{badge.stats}</dd>
                 </div>
               </dl>
@@ -133,7 +147,7 @@ export function AppShell({ email, token, onSignOut }: { email: string; token: st
       <ConfirmDialog
         open={confirmingSignOut}
         busy={signingOut}
-        title="Sign out of CineMatch?"
+        title="Sign out of FilmFlicker?"
         body={signOutError ?? "Your ratings and watched list are saved. You can jump back in anytime."}
         confirmLabel="Sign out"
         onCancel={() => { setConfirmingSignOut(false); setSignOutError(null); }}

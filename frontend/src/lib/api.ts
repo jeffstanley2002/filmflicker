@@ -40,7 +40,7 @@ function isWakeRetryable(error: unknown) {
 }
 
 function wakeErrorMessage() {
-  return "CineMatch is waking up after being idle. Try again in a moment if this does not load automatically.";
+  return "FilmFlicker is waking up after being idle. Try again in a moment if this does not load automatically.";
 }
 
 function delay(ms: number, signal?: AbortSignal) {
@@ -83,7 +83,7 @@ async function requestOnce<T>(path: string, options: ApiOptions, timeoutMs: numb
       } catch {
         // Keep the HTTP status message.
       }
-      if (response.status === 401) window.dispatchEvent(new Event("cinematch:unauthorized"));
+      if (response.status === 401) window.dispatchEvent(new Event("filmflicker:unauthorized"));
       throw new ApiError(message, response.status);
     }
     return response.json() as Promise<T>;
@@ -143,6 +143,14 @@ export function setWatched(token: string, movieId: number, watched: boolean) {
   });
 }
 
+export function setWatchlist(token: string, movieId: number, watchlisted: boolean) {
+  return request<{ movie_id: number; watchlisted: boolean }>(`/watchlist/${movieId}`, {
+    method: "PUT",
+    token,
+    body: JSON.stringify({ watchlisted }),
+  });
+}
+
 export function setRating(token: string, movieId: number, rating: number) {
   return request<{ movie_id: number; rating: number }>(`/ratings/${movieId}`, {
     method: "PUT",
@@ -160,6 +168,10 @@ export function setNotInterested(token: string, movieId: number) {
 
 export function getWatched(token: string, page = 1, signal?: AbortSignal) {
   return request<MoviePage>(`/watched?page=${page}&page_size=24`, { token, signal });
+}
+
+export function getWatchlist(token: string, page = 1, signal?: AbortSignal) {
+  return request<MoviePage>(`/watchlist?page=${page}&page_size=24`, { token, signal });
 }
 
 export function getRecommendations(token: string, model: ModelKey, n = 12, signal?: AbortSignal) {

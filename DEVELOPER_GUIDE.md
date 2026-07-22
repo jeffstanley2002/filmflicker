@@ -1,4 +1,4 @@
-# CineMatch Developer Guide
+# FilmFlicker Developer Guide
 
 This guide is the shortest path from cloning the repository to making a safe change. The README covers setup and deployment; `MODEL_TRAINING_AND_EVALUATION.md` is the detailed model record.
 

@@ -205,7 +205,7 @@ def main():
     tags = data_utils.load_tags()
 
     generation_id = str(uuid.uuid4())
-    with tempfile.TemporaryDirectory(prefix="cinematch-models-", dir=MODELS_DIR.parent) as temporary:
+    with tempfile.TemporaryDirectory(prefix="filmflicker-models-", dir=MODELS_DIR.parent) as temporary:
         staging = Path(temporary)
         print("Training popularity table...")
         popularity.train_and_save(movies, ratings, staging / popularity.ARTIFACT.name)

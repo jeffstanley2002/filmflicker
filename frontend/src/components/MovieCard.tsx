@@ -9,15 +9,17 @@ type Props = {
   userRating?: number | null;
   busy?: boolean;
   onWatch?: (watched: boolean) => void;
+  watchTitle?: string;
   onRate?: (rating: number) => void;
   onDismiss?: () => void;
+  dismissTitle?: string;
 };
 
 function cleanTitle(title: string) {
   return title.replace(/\s*\([^)]*\)\s*$/g, "").trim();
 }
 
-export function MovieCard({ movie, watched = false, userRating = null, busy = false, onWatch, onRate, onDismiss }: Props) {
+export function MovieCard({ movie, watched = false, userRating = null, busy = false, onWatch, watchTitle, onRate, onDismiss, dismissTitle = "Not interested" }: Props) {
   const gradient = `poster poster-${movie.movie_id % 6}`;
   const [posterFailed, setPosterFailed] = useState(false);
   const showPoster = Boolean(movie.poster_url) && !posterFailed;
@@ -32,7 +34,7 @@ export function MovieCard({ movie, watched = false, userRating = null, busy = fa
           <div className="poster-fallback" aria-label={`${movie.title} poster`}>
             <Clapperboard size={34} />
             <strong>{cleanTitle(movie.title)}</strong>
-            <small>{movie.year ?? "CineMatch"} · {movie.genres[0] ?? "Movie"}</small>
+            <small>{movie.year ?? "FilmFlicker"} · {movie.genres[0] ?? "Movie"}</small>
           </div>
         )}
         {watched ? <div className="poster-badge">Watched</div> : null}
@@ -45,12 +47,12 @@ export function MovieCard({ movie, watched = false, userRating = null, busy = fa
         {"reason" in movie ? <p className="reason">{movie.reason}</p> : null}
         <div className="movie-actions">
           {onWatch ? (
-            <button className={watched ? "watch-button active" : "watch-button"} disabled={busy} onClick={() => onWatch(!watched)} aria-label={watched ? "Remove from watched" : "Mark watched"} title={watched ? "Remove from watched" : "Mark watched"}>
+            <button className={watched ? "watch-button active" : "watch-button"} disabled={busy} onClick={() => onWatch(!watched)} aria-label={watchTitle ?? (watched ? "Remove from watched" : "Mark watched")} title={watchTitle ?? (watched ? "Remove from watched" : "Mark watched")}>
               {watched ? <Check size={17} /> : <Plus size={17} />}
             </button>
           ) : null}
           {onDismiss ? (
-            <button className="watch-button dismiss-button" disabled={busy} onClick={onDismiss} aria-label="Not interested" title="Not interested">
+            <button className="watch-button dismiss-button" disabled={busy} onClick={onDismiss} aria-label={dismissTitle} title={dismissTitle}>
               <ThumbsDown size={16} />
             </button>
           ) : null}

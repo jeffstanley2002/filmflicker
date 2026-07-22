@@ -15,8 +15,11 @@ DEFAULT_DATA_DIR = ROOT_DIR / "data" / "ml-latest-small"
 DATA_DIR = Path(
     # Explicit env override is useful for one-off training runs.
     __import__("os").environ.get(
-        "CINEMATCH_DATA_DIR",
-        str(PROCESSED_DATA_DIR if (PROCESSED_DATA_DIR / "movies.csv").exists() else DEFAULT_DATA_DIR),
+        "FILMFLICKER_DATA_DIR",
+        __import__("os").environ.get(
+            "CINEMATCH_DATA_DIR",
+            str(PROCESSED_DATA_DIR if (PROCESSED_DATA_DIR / "movies.csv").exists() else DEFAULT_DATA_DIR),
+        ),
     )
 )
 MODELS_DIR = ROOT_DIR / "models"
