@@ -20,6 +20,7 @@ export function WatchlistPage({ token }: { token: string }) {
     setActionError(null);
     try {
       await setWatchlist(token, movie.movie_id, false);
+      bumpTasteVersion(token);
       setData((current) => current ? { ...current, total: Math.max(0, current.total - 1), results: current.results.filter((item) => item.movie_id !== movie.movie_id) } : null);
     } catch (err) {
       setActionError(errorMessage(err, "Unable to remove movie from watchlist"));

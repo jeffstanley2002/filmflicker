@@ -7,7 +7,7 @@ import { MovieGridSkeleton } from "../components/MovieGridSkeleton";
 import { MODEL_COPY } from "../lib/models";
 import { getRecommendations, setNotInterested, setWatchlist } from "../lib/api";
 import { errorMessage } from "../lib/errors";
-import { readCachedRecommendations, writeCachedRecommendations } from "../lib/recommendationCache";
+import { bumpTasteVersion, readCachedRecommendations, writeCachedRecommendations } from "../lib/recommendationCache";
 import type { ModelKey, Recommendation } from "../lib/types";
 
 const RECOMMENDATION_LIMIT = 12;
@@ -53,14 +53,21 @@ export function RecommendationsPage({ token }: { token: string }) {
     return () => controller.abort();
   }, [model, token]);
 
+  function removeRecommendation(movieId: number) {
+    setData((current) => {
+      const next = current?.filter((item) => item.movie_id !== movieId) ?? [];
+      writeCachedRecommendations(token, model, RECOMMENDATION_LIMIT, next);
+      return next;
+    });
+  }
+
   async function saveToWatchlist(movie: Recommendation) {
     setBusyId(movie.movie_id);
     setActionError(null);
     try {
       await setWatchlist(token, movie.movie_id, true);
-      const next = data?.filter((item) => item.movie_id !== movie.movie_id) ?? [];
-      setData(next);
-      writeCachedRecommendations(token, model, RECOMMENDATION_LIMIT, next);
+      bumpTasteVersion(token);
+      removeRecommendation(movie.movie_id);
     } catch (err) {
       setActionError(errorMessage(err, "Unable to add movie to your watchlist"));
     } finally {
@@ -73,8 +80,8 @@ export function RecommendationsPage({ token }: { token: string }) {
     setActionError(null);
     try {
       await setNotInterested(token, movie.movie_id);
-      setData((current) => current?.filter((item) => item.movie_id !== movie.movie_id) ?? null);
-      writeCachedRecommendations(token, model, RECOMMENDATION_LIMIT, data?.filter((item) => item.movie_id !== movie.movie_id) ?? []);
+      bumpTasteVersion(token);
+      removeRecommendation(movie.movie_id);
     } catch (err) {
       setActionError(errorMessage(err, "Unable to update your taste feedback"));
     } finally {
