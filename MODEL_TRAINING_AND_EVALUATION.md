@@ -1054,9 +1054,9 @@ This measures in-process model recommendation time after artifact loading. It do
 
 Training and backend requirements pin:
 
-`scikit-learn==1.5.1`
+`scikit-learn==1.6.1`
 
-The global system test interpreter used scikit-learn 1.6.1 and emitted version warnings while loading 1.5.1 artifacts. The deployment backend and training virtual environment both use the pinned 1.5.1 version, avoiding that mismatch in production.
+The committed sklearn artifacts were validated with scikit-learn 1.6.1. The deployment backend and training virtual environment both use the pinned 1.6.1 version, avoiding cross-version artifact loads in production.
 
 ## 17. Deployment roles and recommendation policy
 

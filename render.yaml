@@ -2,7 +2,7 @@ services:
   - type: web
     name: filmflicker-api
     runtime: docker
-    plan: free
+    plan: standard
     branch: main
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
