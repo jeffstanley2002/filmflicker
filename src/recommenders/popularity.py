@@ -1,6 +1,6 @@
 """Rule-based recommender: Bayesian-weighted popularity + genre-overlap
 "because you watched" logic. No training needed beyond aggregating ratings,
-so this doubles as the cold-start fallback for brand-new profiles.
+so this doubles as the explicit cold-start lane for brand-new profiles.
 """
 from pathlib import Path
 

@@ -38,13 +38,15 @@ Authenticated state is never accepted from a request body. `backend/auth.py` ver
 ```text
 ratings + watched + not interested
   -> selected candidate generator
-  -> content/popularity supplements
+  -> selected-model reranking, or fallback only if that model has no candidates
   -> shared quality/diversity reranker
   -> catalog display-data join
   -> RecommendationOut
 ```
 
-The model named by the user is the serving strategy. `source_model` records which candidate generator produced each final item. Preserve both fields when changing recommendation output.
+The model named by the user is the serving strategy. `source_model` records which candidate generator produced each final item. Personalized tabs should not be silently filled with popularity results on true cold start; only the Popular tab is allowed to recommend without watched/rated signal.
+
+Watchlist items are passed as extra exclusions only. Do not merge them into disliked IDs, because excluding a saved movie from the result list is not the same as treating it as a negative rating.
 
 ## Important invariants
 

@@ -21,14 +21,17 @@ def recommend(
     pop_df,
     low_signal: set,
     artifacts: dict,
+    extra_exclude_ids: set | None = None,
     ranking_config: dict | None = None,
 ):
-    exclude = set(watched_ids) | set(disliked_ids) | set(low_signal)
+    exclude = set(watched_ids) | set(disliked_ids) | set(extra_exclude_ids or set()) | set(low_signal)
     preferences = dict(rated)
     preferences.update({movie_id: 1.0 for movie_id in disliked_ids if movie_id not in preferences})
-    pool_n = min(200, max(n * 8, 40))
+    pool_n = min(240, max(n * 10, 60))
 
     if not watched_ids and not disliked_ids:
+        if model != "popularity":
+            return []
         primary = popularity.top_trending(pop_df, n=pool_n, exclude_ids=exclude)
     elif model == "popularity":
         primary = popularity.because_you_watched(
@@ -53,19 +56,28 @@ def recommend(
     else:
         primary = artifacts["neural"].recommend_for_profile(preferences, n=pool_n, exclude_ids=exclude)
 
-    candidates = list(primary)
-    if preferences and model != "content_based":
+    if primary:
+        return ranking.rerank_candidates(
+            primary,
+            movies_df,
+            pop_df,
+            n=n,
+            primary_model=model,
+            config=ranking_config,
+        )
+
+    candidates = []
+    if preferences:
         candidates.extend(
             content_based.recommend_for_profile(
                 preferences, artifacts["content_based"], n=max(n * 4, 24), exclude_ids=exclude
             )
         )
-    if model != "popularity":
-        candidates.extend(
-            popularity.because_you_watched(
-                pop_df, _seed_genres(movies_df, rated), exclude_ids=exclude, n=max(n * 3, 20)
-            )
+    candidates.extend(
+        popularity.because_you_watched(
+            pop_df, _seed_genres(movies_df, rated), exclude_ids=exclude, n=max(n * 3, 20)
         )
+    )
 
     if not candidates:
         candidates = popularity.top_trending(pop_df, n=pool_n, exclude_ids=exclude)

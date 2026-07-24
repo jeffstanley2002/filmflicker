@@ -22,7 +22,7 @@ def get_recommendations(
     n: int = Query(12, ge=1, le=50),
     user_id: str = Depends(get_current_user_id),
 ):
-    """Returns model-specific recommendations with cold-start fallbacks."""
+    """Returns model-specific recommendations; popularity is the only cold-start lane."""
     engine = db.get_connection()
     watched_ids, rated = db.get_profile(engine, user_id)
     disliked_ids = db.get_not_interested_ids(engine, user_id)
@@ -44,11 +44,12 @@ def get_recommendations(
         n=n,
         rated=rated,
         watched_ids=watched_ids,
-        disliked_ids=disliked_ids | watchlist_ids,
+        disliked_ids=disliked_ids,
         movies_df=movies_df,
         pop_df=pop_df,
         low_signal=low_signal,
         artifacts=artifacts,
+        extra_exclude_ids=watchlist_ids,
     )
 
     return recommendation_list(recs, movies_df, links)

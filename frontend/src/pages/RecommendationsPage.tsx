@@ -20,6 +20,9 @@ export function RecommendationsPage({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const emptyCopy = model === "popularity"
+    ? "No crowd favorites are available right now."
+    : `Rate or watch a few movies to unlock ${MODEL_COPY[model].label}. Popular picks stay available while your taste warms up.`;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -98,7 +101,7 @@ export function RecommendationsPage({ token }: { token: string }) {
       {loading ? <MovieGridSkeleton count={RECOMMENDATION_LIMIT} withDismiss /> : null}
       {error ? <EmptyState icon={Radar} title="Could not load recommendations" body={error} /> : null}
       {actionError ? <div className="inline-error">{actionError}</div> : null}
-      {!loading && data?.length === 0 ? <EmptyState icon={Sparkles} title="No picks yet" body="Toss a few ratings into Taste Builder, then come back for the good stuff." /> : null}
+      {!loading && data?.length === 0 ? <EmptyState icon={Sparkles} title="No picks yet" body={emptyCopy} /> : null}
       {!loading && !error ? <section className="movie-grid">
         {data?.map((movie) => (
           <MovieCard key={movie.movie_id} movie={movie} busy={busyId === movie.movie_id} onWatch={() => saveToWatchlist(movie)} watchTitle="Add to watchlist" onDismiss={() => dismiss(movie)} />
