@@ -41,6 +41,8 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
+In Supabase Auth settings, keep email confirmations enabled for email/password accounts. FilmFlicker blocks unconfirmed email sessions, sends users to a check-email screen after registration, and returns confirmed users to the sign-in form.
+
 Set `backend/.env`:
 
 ```bash
@@ -109,15 +111,17 @@ Every API query is scoped by the verified Supabase JWT subject, so users only re
 
 ## Model Metrics
 
-Current metrics are generated from `models/metrics.json` using a per-user temporal holdout of each user's latest interactions. The final untouched test contains 1,000 complete user histories:
+Current metrics are generated from `models/metrics.json` using a per-user temporal holdout of each user's latest interactions. The committed metrics file contains the 1,000-user release gate over complete histories.
 
 | Model | RMSE | Precision@10 | Recall@10 | Hit Rate@10 | NDCG@10 | Diversity |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Collaborative hybrid | 0.907 | 1.40% | 4.07% | 12.2% | 3.08% | 78.8% |
 | Content-based | - | 1.27% | 3.55% | 11.3% | 3.02% | 69.1% |
 | Popularity | - | 1.11% | 3.14% | 10.0% | 2.29% | 69.6% |
-| Taste embeddings | 0.932 | 1.07% | 3.21% | 9.0% | 2.48% | 78.6% |
+| Taste embeddings | 0.960 | 1.30% | 3.93% | 11.2% | 2.79% | 76.4% |
 | Taste neighborhoods | - | 1.03% | 3.14% | 9.4% | 2.19% | 66.6% |
+
+Taste embeddings are now a genuine two-tower neural recommender trained from ratings, not an SVD-derived fallback. In the release-gate evaluation they overlap collaborative on only 43.0% of top-10 items, proving they contribute different candidate signal. Collaborative remains the stronger primary recommender on both rating prediction and top-10 ranking metrics.
 
 Tune only on the chronological validation split:
 
@@ -128,7 +132,7 @@ python scripts/tune_models.py --max-ratings 1000000 --n-validation-users 200
 Regenerate the untouched final metrics with:
 
 ```bash
-python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000
+python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 1000000 --neural-epochs 8
 ```
 
 Validate exported model artifacts before deployment:
@@ -167,12 +171,12 @@ The free MovieLens 32M catalog currently reaches 2023. Very new releases should 
 ```bash
 python scripts/tune_models.py --max-ratings 1000000 --n-validation-users 200
 # Promote the validation winner in collaborative.py and ranking.py, then:
-python scripts/train_models.py
-python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000
+python scripts/train_models.py --neural-sample-size 1000000 --neural-epochs 8
+python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 1000000 --neural-epochs 8
 python scripts/validate_model_export.py
 ```
 
-The default taste-embedding export is derived from trained SVD factors, so local training does not require TensorFlow.
+The taste-embedding export is trained by the NumPy two-tower trainer in `scripts/train_models.py`; validation rejects stale `svd_embedding_fallback` artifacts.
 
 ## Checks
 

@@ -16,6 +16,31 @@ const RecommendationsPage = lazy(() => import("./pages/RecommendationsPage").the
 const SystemDesignPage = lazy(() => import("./pages/SystemDesignPage").then((module) => ({ default: module.SystemDesignPage })));
 const WatchlistPage = lazy(() => import("./pages/WatchlistPage").then((module) => ({ default: module.WatchlistPage })));
 const WatchedPage = lazy(() => import("./pages/WatchedPage").then((module) => ({ default: module.WatchedPage })));
+const CheckEmailPage = lazy(() => import("./pages/AuthPage").then((module) => ({ default: module.CheckEmailPage })));
+
+function isConfirmedSession(nextSession: Session | null) {
+  if (!nextSession) return false;
+  const provider = nextSession.user.app_metadata?.provider;
+  const providers = nextSession.user.app_metadata?.providers;
+  const usesEmailPassword = provider === "email" || (Array.isArray(providers) && providers.includes("email"));
+  return !usesEmailPassword || Boolean(nextSession.user.email_confirmed_at);
+}
+
+function displayNameFromSession(nextSession: Session | null) {
+  const metadata = nextSession?.user.user_metadata ?? {};
+  const metadataName = typeof metadata.display_name === "string" ? metadata.display_name.trim() : "";
+  const metadataUsername = typeof metadata.username === "string" ? metadata.username.trim() : "";
+  const emailPrefix = nextSession?.user.email?.split("@")[0] ?? "Movie friend";
+  return metadataName || metadataUsername || emailPrefix || "Movie friend";
+}
+
+function isSignupConfirmationRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  return window.location.pathname === "/signin" && (
+    params.get("type") === "signup" || hashParams.get("type") === "signup"
+  );
+}
 
 function RequireAuth({ session, children }: { session: Session | null; children: ReactNode }) {
   if (!session) return <Navigate to="/signin" replace />;
@@ -34,15 +59,42 @@ export function App() {
       setLoading(false);
       return;
     }
-    supabase.auth.getSession()
-      .then(({ data }) => setSession(data.session))
+    const client = supabase;
+    client.auth.getSession()
+      .then(async ({ data }) => {
+        if (data.session && !isConfirmedSession(data.session)) {
+          await client.auth.signOut({ scope: "local" });
+          setSession(null);
+          navigate("/check-email", { replace: true, state: { email: data.session.user.email } });
+          return;
+        }
+        if (data.session && isSignupConfirmationRedirect()) {
+          await client.auth.signOut({ scope: "local" });
+          setSession(null);
+          navigate("/signin", { replace: true });
+          return;
+        }
+        setSession(data.session);
+      })
       .catch(() => setSession(null))
       .finally(() => setLoading(false));
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data } = client.auth.onAuthStateChange((_event, nextSession) => {
+      if (nextSession && !isConfirmedSession(nextSession)) {
+        setSession(null);
+        void client.auth.signOut({ scope: "local" });
+        navigate("/check-email", { replace: true, state: { email: nextSession.user.email } });
+        return;
+      }
+      if (nextSession && isSignupConfirmationRedirect()) {
+        setSession(null);
+        void client.auth.signOut({ scope: "local" });
+        navigate("/signin", { replace: true });
+        return;
+      }
       setSession(nextSession);
     });
     return () => data.subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     function unauthorized() {
@@ -71,7 +123,7 @@ export function App() {
       if (now - lastWakePing.current < 60_000) return;
       lastWakePing.current = now;
       void supabase?.auth.getSession().then(({ data }) => {
-        if (!controller.signal.aborted) setSession(data.session);
+        if (!controller.signal.aborted) setSession(isConfirmedSession(data.session) ? data.session : null);
       });
       void warmApi(controller.signal).catch(() => {
         // The next page request will show a user-facing message if Render is still waking.
@@ -99,6 +151,20 @@ export function App() {
 
   const token = session?.access_token ?? "";
   const email = session?.user.email ?? "Signed in";
+  const displayName = displayNameFromSession(session);
+
+  async function updateDisplayName(nextName: string) {
+    if (!supabase) return;
+    const clean = nextName.trim();
+    const { data, error } = await supabase.auth.updateUser({
+      data: {
+        display_name: clean || null,
+        username: clean || null,
+      },
+    });
+    if (error) throw error;
+    if (session && data.user) setSession({ ...session, user: data.user });
+  }
 
   return (
     <Suspense fallback={null}>
@@ -107,12 +173,13 @@ export function App() {
       <Route path="/auth" element={<Navigate to={session ? "/app/browse" : "/signin"} replace />} />
       <Route path="/signin" element={session ? <Navigate to="/app/browse" replace /> : <SignInPage session={session} />} />
       <Route path="/register" element={session ? <Navigate to="/app/browse" replace /> : <RegisterPage session={session} />} />
+      <Route path="/check-email" element={<CheckEmailPage session={session} />} />
       <Route path="/system-design" element={session ? <Navigate to="/app/browse" replace /> : <SystemDesignPage />} />
       <Route
         path="/app"
         element={
           <RequireAuth session={session}>
-            <AppShell email={email} token={token} onSignOut={signOut} />
+            <AppShell email={email} displayName={displayName} token={token} onSignOut={signOut} onUpdateDisplayName={updateDisplayName} />
           </RequireAuth>
         }
       >

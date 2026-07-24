@@ -1,22 +1,24 @@
 {
   "schema_version": 1,
-  "generation_id": "92fa870c-76e5-4b7d-a21a-d4b7f96f1156",
-  "published_at": "2026-07-16T01:59:56.830008+00:00",
+  "generation_id": "3b8a5409-473b-45fc-9f22-f17398bcc4fa",
+  "published_at": "2026-07-24T07:24:09.412735+00:00",
   "checksums": {
     "popularity.csv": "f3dcae7272cf970532bedb14a692dbffb62ebd78bd38ec86e3a9a1a2f3fc136c",
-    "content_tfidf_vectorizer.joblib": "744b2623dab8d309d052c1482b4946171a25077ef69ecfa54b9caf281e843a84",
+    "content_tfidf_vectorizer.joblib": "9cd2f01f52d0866d9e2b815e640a9ac72d0a2d93ec1bcd2b1a573dba8fa78960",
     "content_tfidf_matrix.npz": "a67bdd09b6306306a52ed26e49111ad89539ded8c1f86f7aff946b1dab87bbf9",
     "content_movie_ids.npy": "f2090c0a97cfb6926b8a432d6e10d910b614f9b6e378cdefdee3fcb5d7008035",
-    "collaborative_svd.joblib": "dee7abeef9b4461f83070e98e58577d60064bd5a13df0d020069b67b9bd26be4",
-    "clustering.joblib": "3749226b1240da4b7a567d2d1ebd3358ff6469bf57a1a94972aafc15b2229176",
-    "neural_weights.npz": "56facaaabe130bc59be531b199b092893572552056be59f8d83a9619d44be5ea",
-    "metrics.json": "78f3dc6cbe67652d2d32309baae818349b359bc32917eb9de5cefecc6fb135cf"
+    "collaborative_svd.joblib": "1ece8fe6f987759193a08e8ef1dad01c7bec6e8f10bb2e595e67444ecc34002f",
+    "clustering.joblib": "eec4dc85f92903b058c451eb1b3e48b3dca4b30609f0dff2af2633b8f4186636",
+    "neural_weights.npz": "4a3ec978ed8fc4c015e394c14e8dfc9df330a0c697e268bdcac82caef4803883",
+    "metrics.json": "88d0be1315b833276e266529ca2e6e5cd855f7ab3d8d467da341c91a1b71fecb"
   },
   "catalog_manifest_sha256": "4c6820cabb2539502d895e31588ec56d7025b9078b04d8ce684eeb938f052554",
   "config": {
     "collaborative_components": 64,
     "fold_in_regularization": 0.15,
     "profile_baseline_strength": 3.0,
-    "neural_mode": "embedding"
+    "neural_mode": "two_tower",
+    "neural_epochs": 8,
+    "neural_sample_size": 1000000
   }
 }

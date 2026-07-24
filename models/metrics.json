@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T01:59:56.763298+00:00",
+  "generated_at": "2026-07-24T07:24:09.324751+00:00",
   "data_dir": "/Users/jeffrey/Desktop/proj/data/processed",
   "k": 10,
   "n_eval_users": 1000,
@@ -10,12 +10,12 @@
   "rating_prediction_sample_size": 31615,
   "rating_prediction": {
     "collaborative": {
-      "rmse": 0.907082326383362,
-      "mae": 0.6777608700368973
+      "rmse": 0.9070822062783491,
+      "mae": 0.6777608349348321
     },
     "neural": {
-      "rmse": 0.9322481884137868,
-      "mae": 0.6993534340762887
+      "rmse": 0.9599754454851575,
+      "mae": 0.7268206086041825
     }
   },
   "top_n": {
@@ -81,8 +81,8 @@
       "hit_rate_at_10": 0.122,
       "ndcg_at_10": 0.030826673484280306,
       "mrr_at_10": 0.04881111111111111,
-      "intra_list_diversity": 0.7884141905625238,
-      "mean_novelty_bits": 11.167705632847083,
+      "intra_list_diversity": 0.7883906014972681,
+      "mean_novelty_bits": 11.167471062140274,
       "catalog_coverage": 0.008380430439002112,
       "confidence_intervals_95": {
         "precision_at_10": [
@@ -132,30 +132,30 @@
       }
     },
     "neural": {
-      "precision_at_10": 0.0107,
-      "recall_at_10": 0.03208333333333333,
-      "hit_rate_at_10": 0.09,
-      "ndcg_at_10": 0.02483030396312175,
-      "mrr_at_10": 0.03967857142857143,
-      "intra_list_diversity": 0.7857558901592235,
-      "mean_novelty_bits": 11.535170614243134,
-      "catalog_coverage": 0.007193012502140777,
+      "precision_at_10": 0.013,
+      "recall_at_10": 0.03925,
+      "hit_rate_at_10": 0.112,
+      "ndcg_at_10": 0.02788710741373091,
+      "mrr_at_10": 0.04179801587301587,
+      "intra_list_diversity": 0.763967327271494,
+      "mean_novelty_bits": 11.541395376043278,
+      "catalog_coverage": 0.007866643831706342,
       "confidence_intervals_95": {
         "precision_at_10": [
-          0.008416901282082669,
-          0.01298309871791733
+          0.010605514844656754,
+          0.015394485155343245
         ],
         "recall_at_10": [
-          0.024901589979225574,
-          0.039265076687441086
+          0.03128922224806212,
+          0.04721077775193788
         ],
         "hit_rate_at_10": [
-          0.0722533951984617,
-          0.10774660480153829
+          0.09244360405846153,
+          0.13155639594153848
         ],
         "ndcg_at_10": [
-          0.019162684195322466,
-          0.030497923730921035
+          0.02223989735380229,
+          0.03353431747365952
         ]
       }
     }
@@ -174,8 +174,8 @@
       }
     },
     "rating_prediction": {
-      "rmse": 0.9089210881205324,
-      "mae": 0.6820277090465788
+      "rmse": 0.908921075802697,
+      "mae": 0.6820277024341338
     },
     "top_n": {
       "precision_at_10": 0.0134,
@@ -214,5 +214,48 @@
       }
     }
   },
-  "notes": "Per-user temporal holdout of the latest interactions. Evaluation samples complete user histories. Collaborative, clustering, and latent taste embedding artifacts are retrained on the train split only; content-based and popularity use rating-weighted profiles built from each test user's train-split ratings only. New or cold profiles fall back to popularity."
+  "neural_independence": {
+    "training_mode": "two_tower_neural",
+    "description": "Taste embeddings are trained by an independent two-tower neural model on train-split ratings. They are not exported from collaborative SVD factors.",
+    "mean_top_k_overlap_with_collaborative": 0.4298,
+    "paired_delta_neural_minus_collaborative": {
+      "precision_at_10": {
+        "mean": -0.0010000000000000002,
+        "confidence_interval_95": [
+          -0.0032521417678606614,
+          0.0012521417678606607
+        ]
+      },
+      "recall_at_10": {
+        "mean": -0.0014833333333333335,
+        "confidence_interval_95": [
+          -0.009569395844279615,
+          0.0066027291776129485
+        ]
+      },
+      "hit_rate_at_10": {
+        "mean": -0.01,
+        "confidence_interval_95": [
+          -0.029203599095435684,
+          0.009203599095435685
+        ]
+      },
+      "ndcg_at_10": {
+        "mean": -0.002939566070549396,
+        "confidence_interval_95": [
+          -0.008727667447685796,
+          0.0028485353065870037
+        ]
+      },
+      "mrr_at_10": {
+        "mean": -0.0070130952380952375,
+        "confidence_interval_95": [
+          -0.01815514850483597,
+          0.004128958028645495
+        ]
+      }
+    },
+    "validation_rmse_residual": 0.957301139831543
+  },
+  "notes": "Per-user temporal holdout of the latest interactions. Evaluation samples complete user histories. Collaborative, clustering, and independently trained two-tower taste embedding artifacts are retrained on the train split only; content-based and popularity use rating-weighted profiles built from each test user's train-split ratings only. New or cold profiles fall back to popularity."
 }

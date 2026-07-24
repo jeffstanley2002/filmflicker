@@ -1,5 +1,4 @@
-# Extra dependencies needed ONLY to run scripts/train_models.py locally
-# (specifically the neural embedding model). Not installed on the deployed
-# app - see models/neural.py, which serves pre-trained embeddings with numpy.
+# Extra dependencies needed ONLY to run scripts/train_models.py locally.
+# The two-tower taste-embedding model trains and serves with NumPy, so this
+# file currently tracks the deploy requirements without adding TensorFlow.
 -r requirements.txt
-tensorflow==2.16.1
