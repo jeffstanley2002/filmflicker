@@ -74,12 +74,12 @@ The model named by the user is the serving strategy. `source_model` records whic
 
 ```bash
 backend/.venv/bin/python scripts/tune_models.py --max-ratings 1000000 --n-validation-users 200
-backend/.venv/bin/python scripts/train_models.py --neural-mode embedding
-backend/.venv/bin/python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000
+backend/.venv/bin/python scripts/train_models.py --neural-sample-size 1000000 --neural-epochs 8
+backend/.venv/bin/python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 1000000 --neural-epochs 8
 backend/.venv/bin/python scripts/validate_model_export.py
 ```
 
-Do not deploy artifacts between training and evaluation. Training removes stale metrics; evaluation writes fresh metrics and refreshes the checksum manifest.
+Do not deploy artifacts between training and evaluation. Training removes stale metrics; evaluation writes fresh metrics and refreshes the checksum manifest. `validate_model_export.py` rejects taste-embedding artifacts unless they declare `training_mode=two_tower_neural`.
 
 ## Required checks
 

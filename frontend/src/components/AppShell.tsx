@@ -1,4 +1,4 @@
-import { Award, BarChart3, Bookmark, ChevronLeft, ChevronRight, Heart, LogOut, Radar, Search, Sparkles, Tags, TrendingUp } from "lucide-react";
+import { Award, BarChart3, Bookmark, Check, ChevronLeft, ChevronRight, Heart, LogOut, Pencil, Radar, Search, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { BrandMark } from "./BrandMark";
@@ -14,45 +14,142 @@ function topEntries(record: Record<string, number>, limit = 3) {
     .map(([name, value]) => ({ name, value }));
 }
 
+const genrePersonas: Record<string, { suffix: string; description: string }> = {
+  action: {
+    suffix: "explorer",
+    description: "Big set pieces, clean momentum, and heroes making impossible choices are your comfort zone.",
+  },
+  adventure: {
+    suffix: "quest chaser",
+    description: "You like stories that pack a bag, cross the map, and find trouble with a grin.",
+  },
+  animation: {
+    suffix: "wonder collector",
+    description: "You chase color, heart, and imagination that can sneak up and flatten you emotionally.",
+  },
+  children: {
+    suffix: "storybook scout",
+    description: "Warm, bright, easy-to-love movies have a permanent seat in your watch queue.",
+  },
+  comedy: {
+    suffix: "laugh hunter",
+    description: "Your taste has a soft spot for sharp timing, chaos, and a perfectly landed joke.",
+  },
+  crime: {
+    suffix: "case cracker",
+    description: "Schemes, motives, double-crosses, and morally messy choices keep you leaning forward.",
+  },
+  documentary: {
+    suffix: "truth seeker",
+    description: "You like movies that open a real door and leave you thinking about it later.",
+  },
+  drama: {
+    suffix: "story deep-diver",
+    description: "You gravitate toward complicated people, quiet tension, and feelings with consequences.",
+  },
+  fantasy: {
+    suffix: "realm roamer",
+    description: "Give you strange worlds, old magic, and impossible rules that somehow make emotional sense.",
+  },
+  "film-noir": {
+    suffix: "shadow walker",
+    description: "You appreciate smoky motives, sharp silhouettes, and trouble arriving in excellent lighting.",
+  },
+  horror: {
+    suffix: "midnight braveheart",
+    description: "You are here for dread, atmosphere, and the delicious mistake of opening the wrong door.",
+  },
+  musical: {
+    suffix: "showtime soul",
+    description: "If the feelings are too large to speak, you are fully willing to let them sing.",
+  },
+  mystery: {
+    suffix: "clue chaser",
+    description: "You enjoy a movie that trusts you to notice the small thing before the big reveal.",
+  },
+  romance: {
+    suffix: "heart-reader",
+    description: "You like chemistry, longing, timing, and the tiny looks that do all the damage.",
+  },
+  "sci-fi": {
+    suffix: "future mapper",
+    description: "You chase big ideas, strange tech, and human questions hiding inside impossible futures.",
+  },
+  thriller: {
+    suffix: "tension tuner",
+    description: "You like the pulse rising one careful beat at a time until sitting still becomes a sport.",
+  },
+  war: {
+    suffix: "frontline historian",
+    description: "You are drawn to pressure, sacrifice, and stories where every choice carries weight.",
+  },
+  western: {
+    suffix: "frontier rider",
+    description: "Open horizons, old codes, and hard choices under a wide sky are very much your lane.",
+  },
+};
+
+function personaForGenre(genre: string) {
+  return genrePersonas[genre.toLowerCase()] ?? {
+    suffix: "curator",
+    description: `Your ${genre} streak gives your recommendations a distinct little signature.`,
+  };
+}
+
 function tasteBadge(analytics: Analytics | null) {
   if (!analytics || analytics.movies_watched === 0) {
     return {
       label: "Taste warming up",
-      reason: "Rate and watch a few movies to unlock a sharper taste badge.",
-      genres: ["No genre signal yet"],
-      clusters: ["Discovery style pending"],
-      stats: "0 movies watched",
+      reason: "Rate a few movies and FilmFlicker will turn those sparks into a proper taste alter ego.",
     };
   }
 
   const genres = topEntries(analytics.genre_breakdown);
-  const clusters = topEntries(analytics.cluster_breakdown, 2);
   const favoriteGenre = genres[0]?.name ?? "Mixed";
-  const averageRating = analytics.avg_rating ?? 0;
-  const hasStrongRatings = averageRating >= 4;
   const hasWideTaste = genres.length >= 3;
-  const label = hasWideTaste ? `${favoriteGenre} explorer` : hasStrongRatings ? `${favoriteGenre} fan` : `${favoriteGenre} scout`;
+  const persona = favoriteGenre === "Mixed"
+    ? {
+        suffix: "sampler",
+        description: "Your taste wanders across lanes, which makes your For You shelf harder to predict in the best way.",
+      }
+    : personaForGenre(favoriteGenre);
+  const label = hasWideTaste ? `${favoriteGenre} ${persona.suffix}` : `${favoriteGenre} fan`;
 
   return {
     label,
-    reason: hasWideTaste
-      ? "Assigned from your strongest genre signals and varied watch history."
-      : "Assigned from the movies you have watched and rated so far.",
-    genres: genres.length ? genres.map((entry) => `${entry.name} (${entry.value})`) : ["No genre signal yet"],
-    clusters: clusters.length ? clusters.map((entry) => `${entry.name} (${entry.value})`) : ["Discovery style pending"],
-    stats: `${analytics.movies_watched} watched · ${analytics.movies_rated} rated · ${averageRating.toFixed(1)} avg`,
+    reason: persona.description,
   };
 }
 
-export function AppShell({ email, token, onSignOut }: { email: string; token: string; onSignOut: () => Promise<void> }) {
+export function AppShell({
+  email,
+  displayName,
+  token,
+  onSignOut,
+  onUpdateDisplayName,
+}: {
+  email: string;
+  displayName: string;
+  token: string;
+  onSignOut: () => Promise<void>;
+  onUpdateDisplayName: (nextName: string) => Promise<void>;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const [peeking, setPeeking] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const name = email.split("@")[0] || "Movie friend";
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(displayName);
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const name = displayName || email.split("@")[0] || "Movie friend";
   const badge = useMemo(() => tasteBadge(analytics), [analytics]);
+
+  useEffect(() => {
+    setNameDraft(displayName);
+  }, [displayName]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -89,6 +186,19 @@ export function AppShell({ email, token, onSignOut }: { email: string; token: st
     }
   }
 
+  async function saveDisplayName() {
+    setSavingName(true);
+    setNameError(null);
+    try {
+      await onUpdateDisplayName(nameDraft);
+      setEditingName(false);
+    } catch (error) {
+      setNameError(errorMessage(error, "Unable to update your display name."));
+    } finally {
+      setSavingName(false);
+    }
+  }
+
   return (
     <div className={`app-shell${collapsed ? " sidebar-collapsed" : ""}${peeking ? " sidebar-peeking" : ""}`}>
       <aside className="sidebar" aria-label="Primary navigation" onMouseLeave={() => setPeeking(false)}>
@@ -121,20 +231,28 @@ export function AppShell({ email, token, onSignOut }: { email: string; token: st
                   <p>{badge.reason}</p>
                 </div>
               </div>
-              <dl>
-                <div>
-                  <dt><Tags size={13} /> Top tastes</dt>
-                  <dd>{badge.genres.join(", ")}</dd>
-                </div>
-                <div>
-                  <dt><Sparkles size={13} /> Discovery style</dt>
-                  <dd>{badge.clusters.join(", ")}</dd>
-                </div>
-                <div>
-                  <dt><TrendingUp size={13} /> Profile signal</dt>
-                  <dd>{badge.stats}</dd>
-                </div>
-              </dl>
+              <div className="profile-name-editor">
+                {editingName ? (
+                  <>
+                    <input
+                      value={nameDraft}
+                      onChange={(event) => setNameDraft(event.target.value)}
+                      placeholder="Display name"
+                      maxLength={40}
+                      aria-label="Display name"
+                    />
+                    <button type="button" onClick={saveDisplayName} disabled={savingName} aria-label="Save display name">
+                      <Check size={15} />
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => setEditingName(true)}>
+                    <Pencil size={13} />
+                    Change display name
+                  </button>
+                )}
+              </div>
+              {nameError ? <p className="profile-name-error">{nameError}</p> : null}
             </div>
           </div>
           <button className="ghost-button" onClick={() => { setSignOutError(null); setConfirmingSignOut(true); }}><LogOut size={16} /><span>Sign out</span></button>

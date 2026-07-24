@@ -91,6 +91,16 @@ def validate() -> list[str]:
             n_movies = len(neural["movie_ids"])
             if any(len(neural[name]) != n_movies for name in ("movie_emb", "movie_bias", "genre_matrix")):
                 failures.append("Embedding arrays do not match movie IDs")
+            mode = str(np.asarray(neural.get("training_mode", "missing")).item())
+            if mode != "two_tower_neural":
+                failures.append(
+                    "Neural artifact must be independently trained two_tower_neural; "
+                    f"found {mode!r}"
+                )
+            if neural["Wi"].shape[0] != neural["movie_emb"].shape[1] + neural["genre_matrix"].shape[1]:
+                failures.append("Neural item tower input width does not match movie embeddings plus genres")
+            if neural["Wi"].shape[1] != len(neural["bi"]):
+                failures.append("Neural item tower output width does not match bias")
             for name in neural.files:
                 if np.issubdtype(neural[name].dtype, np.number):
                     _finite(f"neural {name}", neural[name], failures)
@@ -102,6 +112,9 @@ def validate() -> list[str]:
         for key in ("rating_prediction", "top_n", "k", "n_eval_users"):
             if key not in metrics:
                 failures.append(f"metrics.json missing key: {key}")
+        neural_evidence = metrics.get("neural_independence", {})
+        if neural_evidence.get("training_mode") != "two_tower_neural":
+            failures.append("metrics.json does not document two_tower_neural independence evidence")
         if metrics.get("n_eval_users", 0) < 100:
             failures.append("Evaluation sample is too small (minimum 100 users)")
     except (OSError, json.JSONDecodeError) as exc:

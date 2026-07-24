@@ -1,16 +1,10 @@
-"""Neural collaborative filtering, served WITHOUT a TensorFlow dependency.
+"""Two-tower neural recommender, served without a training dependency.
 
-Two-tower architecture (classic Neural CF style), trained offline with
-Keras in scripts/train_models.py: a user tower and an item tower (movie
-embedding + genre features) each project into a shared latent space, and
-the predicted rating is dot(user_vec, item_vec) + user_bias + item_bias
-+ global_mean. Only the item tower's weights are exported (see
-save_weights/load below) - the user tower is used during training but
-never at serve time, since every profile the app ever predicts for is a
-cold-start fold-in, never a "known" MovieLens user with a trained
-embedding. At serve time this module reimplements the item tower's
-forward pass in plain numpy, keeping the deployed app's dependency
-footprint tiny and its cold start fast.
+The offline trainer learns a genuine two-tower model from ratings: a user
+tower and an item tower (movie embedding + genre features) project into a
+shared latent space, and the prediction is dot(user_vec, item_vec) plus item
+and user biases. Only the item tower is exported. Production profiles are
+cold-start fold-ins, never MovieLens users with a trained user embedding.
 
 New profiles get an "implied" vector: a rating-weighted (mean-centered)
 average of the *item tower's output* for movies they've rated - directly
@@ -34,6 +28,12 @@ def relu(x):
 
 class NeuralRecommender:
     def __init__(self, weights: dict):
+        self.training_mode = str(np.asarray(weights.get("training_mode", "missing")).item())
+        if self.training_mode != "two_tower_neural":
+            raise ValueError(
+                "neural_weights.npz must contain an independently trained "
+                f"two_tower_neural artifact, found {self.training_mode!r}"
+            )
         self.movie_emb = weights["movie_emb"]  # (n_movies, embed_dim)
         self.movie_bias = weights["movie_bias"]  # (n_movies,)
         self.genre_matrix = weights["genre_matrix"]  # (n_movies, n_genres)
@@ -92,7 +92,7 @@ class NeuralRecommender:
                 Recommendation(
                     movie_id=mid,
                     score=float(preds[o]),
-                    reason=f"Embedding model predicts {preds[o]:.1f}★ for you",
+                    reason=f"Two-tower taste model predicts {preds[o]:.1f}★ for you",
                     model="neural",
                 )
             )

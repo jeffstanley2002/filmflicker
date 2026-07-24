@@ -1,5 +1,9 @@
+import numpy as np
 import pandas as pd
+import pytest
 
+from scripts.train_models import build_and_train_neural
+from src.recommenders import neural
 from src.recommenders.base import Recommendation, profile_baseline
 from src.recommenders.ranking import rerank_candidates
 
@@ -70,3 +74,47 @@ def test_reranker_accepts_normalized_weight_configuration():
 
     assert personalized[0].movie_id == 1
     assert quality[0].movie_id == 2
+
+
+def test_neural_trainer_exports_independent_two_tower_artifact():
+    movies = pd.DataFrame(
+        {
+            "movieId": [1, 2, 3, 4],
+            "title": ["A (2000)", "B (2000)", "C (2000)", "D (2000)"],
+            "genres": ["Action|Adventure", "Action", "Drama", "Drama|Romance"],
+            "genre_list": [["Action", "Adventure"], ["Action"], ["Drama"], ["Drama", "Romance"]],
+        }
+    )
+    ratings = pd.DataFrame(
+        {
+            "userId": [1, 1, 1, 2, 2, 2, 3, 3, 3],
+            "movieId": [1, 2, 3, 1, 3, 4, 2, 3, 4],
+            "rating": [5.0, 4.5, 1.0, 1.0, 4.5, 5.0, 4.0, 2.0, 1.5],
+            "timestamp": list(range(9)),
+        }
+    )
+
+    weights = build_and_train_neural(movies, ratings, epochs=1)
+    model = neural.NeuralRecommender(weights)
+
+    assert str(weights["training_mode"]) == "two_tower_neural"
+    assert model.movie_emb.shape[0] == len(weights["movie_ids"])
+    assert model.Wi.shape[0] == model.movie_emb.shape[1] + model.genre_matrix.shape[1]
+    _, preds = model.predict_for_profile({1: 5.0, 3: 1.0}, [2, 4])
+    assert len(preds) == 2
+
+
+def test_neural_recommender_rejects_svd_fallback_artifact():
+    weights = {
+        "movie_emb": np.zeros((1, 2), dtype="float32"),
+        "movie_bias": np.zeros(1, dtype="float32"),
+        "genre_matrix": np.zeros((1, 0), dtype="float32"),
+        "Wi": np.eye(2, dtype="float32"),
+        "bi": np.zeros(2, dtype="float32"),
+        "global_mean": np.float32(3.5),
+        "movie_ids": np.array([1], dtype="int32"),
+        "training_mode": np.array("svd_embedding_fallback"),
+    }
+
+    with pytest.raises(ValueError, match="two_tower_neural"):
+        neural.NeuralRecommender(weights)

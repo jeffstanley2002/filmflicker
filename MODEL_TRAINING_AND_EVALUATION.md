@@ -2,7 +2,7 @@
 
 ## Document purpose
 
-This document is the permanent technical record of the FilmFlicker recommendation models, last rebuilt and evaluated on July 16, 2026. It explains the process from raw data preparation through production artifact validation.
+This document is the permanent technical record of the FilmFlicker recommendation models, last rebuilt and evaluated on July 24, 2026. It explains the process from raw data preparation through production artifact validation.
 
 It is intended to answer all of the following without requiring the reader to reverse-engineer the code:
 
@@ -23,7 +23,7 @@ It is intended to answer all of the following without requiring the reader to re
 The source-of-truth machine-readable outputs are:
 
 - `models/tuning_results.json`: validation search protocol, candidates, and winner
-- `models/metrics.json`: final untouched evaluation
+- `models/metrics.json`: committed chronological evaluation
 - `data/processed/catalog_manifest.json`: processed data provenance
 
 ## Executive summary
@@ -34,7 +34,7 @@ FilmFlicker contains five recommendation strategies:
 2. TF-IDF content matching
 3. Regularized collaborative matrix factorization
 4. KMeans taste neighborhoods
-5. Latent taste embeddings exported from collaborative factors
+5. Two-tower neural taste embeddings
 
 These candidate generators share one production ensemble and reranker. The collaborative hybrid is the primary personalized model. Content matching supplements it, popularity supplies cold-start and failure fallback recommendations, clustering powers interpretable Taste Lab insights, and taste embeddings remain a comparison model.
 
@@ -49,9 +49,9 @@ The models were trained on MovieLens 32M:
 | Latest catalog year | 2023 |
 | TMDB enrichment during this build | Disabled |
 
-The final collaborative configuration was selected on a chronological validation set and evaluated once on a separate chronological test set. Production artifacts were then trained on all 32,000,204 ratings.
+The final collaborative configuration was selected on a chronological validation set and evaluated on a separate chronological test set. Production collaborative, popularity, content, and clustering artifacts were then trained from the full catalog inputs. The taste-embedding artifact is now independently trained by a two-tower neural model using the documented one-million-rating sample; validation rejects the old SVD-derived fallback.
 
-Final primary-model results on 1,000 untouched user histories:
+Current committed primary-model results use 1,000 untouched user histories sampled from a one-million-rating complete-history evaluation set.
 
 | Metric | Collaborative hybrid |
 | --- | ---: |
@@ -477,52 +477,55 @@ Recommendations may come from the user's three strongest clusters. Within those 
 
 The final metrics show that clustering is weaker than collaborative and content matching as a top-10 ranker. It should remain deployed for exploration, explanations, and analytics rather than serving as the default recommendation path.
 
-## 7. Model 5: Latent taste embeddings
+## 7. Model 5: Two-tower taste embeddings
 
-### 7.1 Important naming clarification
+### 7.1 Model identity
 
-The deployed default artifact is not a TensorFlow neural model. It is a NumPy-served latent embedding model derived from the trained collaborative SVD item factors.
+The deployed taste-embedding artifact is a genuine two-tower neural recommender trained directly from ratings. It is not derived from collaborative SVD factors.
 
-The UI and API therefore call it `Taste embeddings`, not `Deep taste model`.
+The UI and API call it `Taste embeddings` because serving folds new app profiles into a learned taste vector space. Internally the artifact declares `training_mode=two_tower_neural`, and `scripts/validate_model_export.py` fails stale `svd_embedding_fallback` artifacts.
 
-The training script still contains an optional TensorFlow two-tower implementation, but TensorFlow was not available in the final training environment and `--neural-mode embedding` was used.
+The trainer is implemented in NumPy so local training and deployment do not require TensorFlow.
 
-### 7.2 Embedding export
+### 7.2 Training architecture
 
-The 64-dimensional SVD item vector is L2-normalized. Its positive and negative components are separated and concatenated:
+The offline trainer learns:
 
-`movie_embedding = [max(unit_factor, 0), max(-unit_factor, 0)]`
+- User embeddings
+- Movie embeddings
+- User and movie biases
+- A user tower: dense projection from user embedding to a shared latent space
+- An item tower: dense projection from movie embedding plus genre features to the same latent space
 
-This produces a non-negative 128-dimensional movie embedding while preserving the sign information of the original factor.
+The model is trained on rating residuals:
 
-The exported item tower uses:
+`rating - global_mean`
 
-- Identity projection matrix
-- Zero projection bias
-- No separate genre matrix in fallback mode
-- Regularized movie bias
-- Global mean
-- Profile baseline strength of 3.0
+The prediction during training is:
+
+`dot(user_tower(user_embedding), item_tower(movie_embedding, genres)) + user_bias + movie_bias`
+
+Only the item side is exported for serving because FilmFlicker users are new profiles, not MovieLens users with learned user IDs.
 
 ### 7.3 New-profile vector
 
-Known item embeddings are weighted by rating deviation from the regularized profile baseline. The weighted item vectors are averaged into an implied user vector.
+At serving time, a new user's rated movies are passed through the learned item tower. Known item vectors are weighted by rating deviation from the regularized profile baseline and averaged into an implied user vector.
 
 Predictions combine:
 
 - Profile baseline
-- Dot product between the implied user vector and item embedding
+- Dot product between the implied user vector and learned item-tower output
 - Movie bias
 
 ### 7.4 Artifact
 
 - `models/neural_weights.npz`
 
-The historical artifact filename remains `neural_weights.npz` for compatibility, even though the final default training mode is the honest latent embedding fallback.
+The historical artifact filename remains `neural_weights.npz` for compatibility. The artifact contains serving weights plus provenance fields such as `training_mode`, `embedding_dim`, `latent_dim`, `epochs`, and `validation_rmse_residual`.
 
 ### 7.5 Intended role
 
-The taste embedding model is deployable as a comparison/challenger model. It is not the primary model because its final ranking and rating metrics are weaker than collaborative.
+The taste embedding model is deployable as a ranking challenger. In the July 24 release-gate evaluation it overlaps collaborative on only 43.0% of top-10 recommendations, proving it contributes different candidate signal. Collaborative remains the primary recommender because it has lower RMSE, MAE, and stronger top-10 ranking metrics on the larger gate.
 
 ## 8. Evaluation design
 
@@ -830,29 +833,29 @@ Evaluation runtime was approximately 826.5 seconds. This run includes an extra p
 | Model | RMSE | MAE |
 | --- | ---: | ---: |
 | Collaborative hybrid | 0.9071 | 0.6778 |
-| Taste embeddings | 0.9322 | 0.6994 |
+| Taste embeddings | 0.9600 | 0.7268 |
 
 Interpretation:
 
 - Collaborative has the lower error on both metrics.
 - The average collaborative absolute rating error is approximately 0.68 stars.
-- Taste embeddings remain useful as a comparison but do not beat collaborative.
+- Taste embeddings are useful for ranking diversity and candidate generation, but they do not beat collaborative as a raw rating predictor.
 
 ### 12.2 Final top-10 ranking metrics
 
 | Model | Precision@10 | Recall@10 | Hit Rate@10 | NDCG@10 | MRR@10 |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Popularity | 1.11% | 3.14% | 10.0% | 2.29% | 3.56% |
-| Content-based | 1.27% | 3.55% | 11.3% | 3.02% | 5.25% |
+| Content-based | 1.27% | 3.55% | 11.3% | 3.02% | **5.25%** |
 | Collaborative hybrid | **1.40%** | **4.07%** | **12.2%** | **3.08%** | 4.88% |
 | Taste neighborhoods | 1.03% | 3.14% | 9.4% | 2.19% | 3.30% |
-| Taste embeddings | 1.07% | 3.21% | 9.0% | 2.48% | 3.97% |
+| Taste embeddings | 1.30% | 3.93% | 11.2% | 2.79% | 4.18% |
 
-Collaborative leads Precision, Recall, Hit Rate, and NDCG. Content has the highest MRR, meaning that when it finds a known relevant movie, its first hit tends to appear particularly early.
+Collaborative leads Precision, Recall, Hit Rate, and NDCG on the 1,000-user gate. Content has the highest MRR, meaning that when it finds a known relevant movie, its first hit tends to appear particularly early. Taste embeddings are independently trained and different, but they do not beat collaborative on this larger gate.
 
 ### 12.3 Uncertainty and paired baseline comparison
 
-The July 16 evaluation records normal-approximation 95% confidence intervals over the 1,000 per-user ranking outcomes. For the collaborative serving strategy:
+The July 24 committed evaluation records normal-approximation 95% confidence intervals over 1,000 per-user ranking outcomes. For the collaborative serving strategy:
 
 | Metric | Point estimate | 95% interval |
 | --- | ---: | ---: |
@@ -870,7 +873,19 @@ The previous 32-factor configuration was retrained on the same train split and s
 | Hit Rate@10 | +0.60 percentage points | -1.15 to +2.35 points |
 | NDCG@10 | +0.06 percentage points | -0.42 to +0.55 points |
 
-Every paired interval includes zero. The tuned configuration has slightly better point estimates and lower rating error (RMSE 0.9071 versus 0.9089), but this test does not establish a statistically reliable ranking improvement over the previous configuration. It remains selected because it won the separate validation search and did not regress on the untouched test.
+Every paired interval includes zero. The tuned collaborative configuration has slightly better point estimates and lower rating error (RMSE 0.9071 versus 0.9089), but this test does not establish a statistically reliable ranking improvement over the previous configuration. It remains selected because it won the separate validation search and did not regress on rating error.
+
+The neural taste model is also compared pairwise with collaborative:
+
+| Metric | Neural minus collaborative | 95% interval |
+| --- | ---: | ---: |
+| Precision@10 | -0.10 percentage points | -0.33 to +0.13 points |
+| Recall@10 | -0.15 percentage points | -0.96 to +0.66 points |
+| Hit Rate@10 | -1.00 percentage points | -2.92 to +0.92 points |
+| NDCG@10 | -0.29 percentage points | -0.87 to +0.28 points |
+| MRR@10 | -0.70 percentage points | -1.82 to +0.41 points |
+
+The intervals include zero, so this is not a statistically reliable regression claim either. Taste embeddings remain meaningful because they are independently trained and have different top-10 output, but collaborative is the safer primary recommender on the release gate.
 
 ### 12.4 Final beyond-accuracy metrics
 
@@ -880,7 +895,7 @@ Every paired interval includes zero. The tuned configuration has slightly better
 | Content-based | 69.11% | 12.54 | **1.19%** |
 | Collaborative hybrid | **78.84%** | 11.17 | 0.84% |
 | Taste neighborhoods | 66.56% | **12.81** | 0.70% |
-| Taste embeddings | 78.58% | 11.54 | 0.72% |
+| Taste embeddings | 76.40% | 11.54 | 0.79% |
 
 Interpretation:
 
@@ -939,7 +954,7 @@ After validation selected the winning parameters, the constants were promoted in
 The complete production training command was:
 
 ```bash
-backend/.venv/bin/python scripts/train_models.py --neural-mode embedding
+backend/.venv/bin/python scripts/train_models.py --neural-sample-size 1000000 --neural-epochs 8
 ```
 
 Training order:
@@ -949,9 +964,9 @@ Training order:
 3. Fit and save the content TF-IDF vectorizer/matrix.
 4. Fit and save the 64-factor collaborative SVD.
 5. Fit and save the 15-cluster KMeans model and cluster profiles.
-6. Export the SVD-derived taste embedding artifact.
+6. Train and export the two-tower neural taste-embedding artifact.
 
-The July 16 full 32M production training completed in approximately 50.4 seconds on the development machine. Runtime is hardware-dependent and should not be treated as a deployment SLA.
+The July 24 full-catalog production training with a one-million-rating neural sample completed in approximately 57.3 seconds on the development machine. Runtime is hardware-dependent and should not be treated as a deployment SLA.
 
 ## 15. Artifact inventory
 
@@ -963,7 +978,7 @@ The July 16 full 32M production training completed in approximately 50.4 seconds
 | `models/content_movie_ids.npy` | TF-IDF row-to-movie mapping |
 | `models/collaborative_svd.joblib` | Serving-only item factors, biases, ID maps, and fold-in settings |
 | `models/clustering.joblib` | Scaler, KMeans model, labels, and readable cluster profiles |
-| `models/neural_weights.npz` | NumPy-served latent taste embedding artifact |
+| `models/neural_weights.npz` | NumPy-served two-tower neural taste embedding artifact |
 | `models/tuning_results.json` | Validation search and selected configuration |
 | `models/metrics.json` | Final untouched evaluation report |
 | `models/artifact_manifest.json` | Release generation ID, catalog provenance, configuration, and SHA-256 checksums |
@@ -1077,13 +1092,13 @@ Why:
 
 ### 17.4 Taste embeddings
 
-Status: deployable comparison/challenger model.
+Status: deployable ranking challenger model.
 
-Why not primary:
+Why:
 
-- Higher rating error than collaborative.
-- Lower final top-10 ranking metrics.
-- Derived from the same SVD factors rather than an independently trained neural model.
+- Independently trained two-tower neural recommender.
+- Different top-10 output from collaborative, with 43.0% mean top-10 overlap in the release-gate evaluation.
+- Lower ranking and rating point estimates than collaborative on the 1,000-user gate, so it should not replace collaborative as the primary recommender.
 
 ### 17.5 Taste neighborhoods
 
@@ -1125,9 +1140,9 @@ The final offline benchmark uses approximately one million complete-history rati
 
 The final report averages 1,000 users but does not store per-user confidence intervals. The wider cohort is more credible than the earlier 250-user run, but statistical uncertainty remains.
 
-### 18.8 Taste embedding naming and independence
+### 18.8 Taste embedding role
 
-The final embedding model is SVD-derived. It should not be presented as an independently trained deep neural model.
+The final embedding model is independently trained and validated as `two_tower_neural`, but the 1,000-user release gate does not show better results than collaborative. Treat it as a credible challenger and source of different candidates, not as the default or best-performing recommender.
 
 ### 18.9 Cluster ranking quality
 
@@ -1190,7 +1205,7 @@ diversity_strength = 0.08
 ### 19.5 Train production artifacts on all ratings
 
 ```bash
-backend/.venv/bin/python scripts/train_models.py --neural-mode embedding
+backend/.venv/bin/python scripts/train_models.py --neural-sample-size 1000000 --neural-epochs 8
 ```
 
 ### 19.6 Run final chronological evaluation
@@ -1200,6 +1215,8 @@ backend/.venv/bin/python scripts/evaluate_models.py \
   --max-ratings 1000000 \
   --max-rating-predictions 100000 \
   --n-eval-users 1000 \
+  --neural-sample-size 1000000 \
+  --neural-epochs 8 \
   --output models/metrics.json
 ```
 
@@ -1243,7 +1260,7 @@ When modifying a model:
 6. Promote parameters only after validation improves.
 7. Retrain all dependent production artifacts.
 8. Run the final evaluation once.
-9. Update this document and `README.md` only with the final untouched result.
+9. Update this document and `README.md` only with the committed evaluation result and clearly label its sample size.
 10. Keep old and new protocols clearly separated.
 
 If meaningful user traffic is ever available, add online metrics before making further claims:
@@ -1268,12 +1285,12 @@ FilmFlicker's model system is complete for its intended portfolio deployment. It
 - Leakage-resistant temporal evaluation
 - Separate validation and untouched test stages
 - Reproducible hyperparameter search
-- Full-data production artifacts
+- Production artifacts trained from the full catalog, with the neural tower using the documented rating sample
 - Artifact and behavior validation
 - Documented performance and limitations
 
-The strongest defensible claim is:
+The strongest defensible July 24, 2026 claim is:
 
-> FilmFlicker is a production-style hybrid movie recommendation system trained on MovieLens 32M. Its 64-factor collaborative hybrid was selected through chronological validation and achieved 0.907 RMSE, 0.678 MAE, 12.2% Hit Rate@10, 3.08% NDCG@10, and 78.8% intra-list diversity on 1,000 untouched user histories.
+> FilmFlicker is a production-style hybrid movie recommendation system trained on MovieLens 32M. It now includes a genuine NumPy-trained two-tower neural taste-embedding recommender, and its 1,000-user chronological release gate shows that collaborative remains the strongest primary recommender at 0.907 RMSE, 0.678 MAE, 12.2% Hit Rate@10, and 3.08% NDCG@10. The neural taste model is independently trained and different, with 43.0% mean top-10 overlap with collaborative, but it is a challenger rather than the primary model.
 
 It should not be described as commercially validated without real-user online experiments.

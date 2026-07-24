@@ -8,8 +8,8 @@ generalization, then reports:
     against each sampled test user's held-out "liked" movies (rating >= 4)
 
 Results are written to models/metrics.json for the app's model metrics page.
-The default embedding evaluation is NumPy-only; TensorFlow is needed only
-when explicitly training the optional two-tower neural variant.
+The taste-embedding evaluation is NumPy-only and retrains an independent
+two-tower neural model on the train split.
 
 Run: python scripts/evaluate_models.py
 """
@@ -29,7 +29,7 @@ from src import data_utils, evaluate
 from src.artifacts import atomic_write_text, write_manifest
 from src.recommenders import clustering, collaborative, content_based, ensemble, neural, popularity
 from src.recommenders.base import low_signal_movie_ids, profile_baseline
-from train_models import build_embedding_fallback_weights
+from train_models import EPOCHS, DEFAULT_NEURAL_SAMPLE_SIZE, build_and_train_neural
 
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 K = 10
@@ -64,6 +64,8 @@ def main():
     parser.add_argument("--max-rating-predictions", type=int, default=DEFAULT_MAX_RATING_PREDICTIONS)
     parser.add_argument("--n-eval-users", type=int, default=N_EVAL_USERS)
     parser.add_argument("--k", type=int, default=K)
+    parser.add_argument("--neural-sample-size", type=int, default=DEFAULT_NEURAL_SAMPLE_SIZE)
+    parser.add_argument("--neural-epochs", type=int, default=EPOCHS)
     parser.add_argument("--output", type=Path, default=MODELS_DIR / "metrics.json")
     args = parser.parse_args()
 
@@ -104,8 +106,11 @@ def main():
         movies, train_ratings, out_path=MODELS_DIR / "_eval_clustering.joblib"
     )
 
-    print("Building latent taste embedding artifact from train-split SVD factors...")
-    neural_weights = build_embedding_fallback_weights(collab_artifacts, train_ratings)
+    print("Retraining independent two-tower neural taste model on train split...")
+    neural_train = _sample_complete_user_histories(train_ratings, args.neural_sample_size)
+    if len(neural_train) < len(train_ratings):
+        print(f"Sampled complete histories for neural training: {len(neural_train):,}/{len(train_ratings):,} ratings.")
+    neural_weights = build_and_train_neural(movies, neural_train, epochs=args.neural_epochs)
     neural_model = neural.NeuralRecommender(neural_weights)
 
     print("Loading content-based + popularity artifacts (content is rating-independent)...")
@@ -200,6 +205,8 @@ def main():
     coverage_ids = {m: set() for m in topn_scores}
     baseline_scores = {name: [] for name in ("precision", "recall", "hit_rate", "ndcg")}
     paired_deltas = {name: [] for name in baseline_scores}
+    neural_vs_collab_deltas = {name: [] for name in ("precision", "recall", "hit_rate", "ndcg", "mrr")}
+    neural_collab_overlaps = []
     genres_by_movie = {
         int(row.movieId): set(row.genre_list) for row in movies[["movieId", "genre_list"]].itertuples(index=False)
     }
@@ -248,6 +255,7 @@ def main():
             ranking_config=BASELINE_RANKING_CONFIG,
         )
         baseline_ids = [rec.movie_id for rec in baseline_recs]
+        rec_ids_by_model = {}
         baseline_p, baseline_r = evaluate.precision_recall_at_k(baseline_ids, relevant, args.k)
         baseline_values = {
             "precision": baseline_p,
@@ -259,6 +267,7 @@ def main():
             baseline_scores[name].append(value)
         for model_name, rec_list in recs.items():
             rec_ids = [r.movie_id for r in rec_list]
+            rec_ids_by_model[model_name] = rec_ids
             coverage_ids[model_name].update(rec_ids)
             p, r = evaluate.precision_recall_at_k(rec_ids, relevant, args.k)
             topn_scores[model_name]["precision"].append(p)
@@ -276,6 +285,17 @@ def main():
                 tuned_values = {"precision": p, "recall": r, "hit_rate": topn_scores[model_name]["hit_rate"][-1], "ndcg": topn_scores[model_name]["ndcg"][-1]}
                 for name in paired_deltas:
                     paired_deltas[name].append(tuned_values[name] - baseline_values[name])
+        collaborative_ids = rec_ids_by_model.get("collaborative", [])
+        neural_ids = rec_ids_by_model.get("neural", [])
+        if collaborative_ids and neural_ids:
+            neural_collab_overlaps.append(
+                len(set(collaborative_ids) & set(neural_ids)) / max(min(len(collaborative_ids), len(neural_ids), args.k), 1)
+            )
+            for name in neural_vs_collab_deltas:
+                neural_key = "mrr" if name == "mrr" else name
+                neural_values = topn_scores["neural"][neural_key]
+                collaborative_values = topn_scores["collaborative"][neural_key]
+                neural_vs_collab_deltas[name].append(neural_values[-1] - collaborative_values[-1])
 
     topn_metrics = {
         m: {
@@ -328,9 +348,25 @@ def main():
                 for name, values in paired_deltas.items()
             },
         },
+        "neural_independence": {
+            "training_mode": str(np.asarray(neural_weights.get("training_mode", "unknown")).item()),
+            "description": (
+                "Taste embeddings are trained by an independent two-tower neural model on train-split ratings. "
+                "They are not exported from collaborative SVD factors."
+            ),
+            "mean_top_k_overlap_with_collaborative": float(np.mean(neural_collab_overlaps)) if neural_collab_overlaps else 0.0,
+            "paired_delta_neural_minus_collaborative": {
+                f"{name}_at_{args.k}": {
+                    "mean": float(np.mean(values)) if values else 0.0,
+                    "confidence_interval_95": confidence_interval(values),
+                }
+                for name, values in neural_vs_collab_deltas.items()
+            },
+            "validation_rmse_residual": float(np.asarray(neural_weights.get("validation_rmse_residual", np.nan))),
+        },
         "notes": (
             "Per-user temporal holdout of the latest interactions. Evaluation samples complete user histories. "
-            "Collaborative, clustering, and latent taste embedding artifacts are retrained on the train split only; "
+            "Collaborative, clustering, and independently trained two-tower taste embedding artifacts are retrained on the train split only; "
             "content-based and popularity use rating-weighted profiles built from each test user's "
             "train-split ratings only. New or cold profiles fall back to popularity."
         ),
