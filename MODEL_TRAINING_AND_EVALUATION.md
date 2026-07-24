@@ -36,7 +36,7 @@ FilmFlicker contains five recommendation strategies:
 4. KMeans taste neighborhoods
 5. Two-tower neural taste embeddings
 
-These candidate generators share one production ensemble and reranker. The collaborative hybrid is the primary personalized model. Content matching supplements it, popularity supplies cold-start and failure fallback recommendations, clustering powers interpretable Taste Lab insights, and taste embeddings remain a comparison model.
+These candidate generators share one production ensemble and reranker. The collaborative hybrid is the strongest personalized model, but each For You tab is now served by its selected primary generator when possible. Popularity is the explicit cold-start lane, content matching also powers `more like this`, clustering powers interpretable discovery neighborhoods, and taste embeddings remain a comparison model.
 
 The models were trained on MovieLens 32M:
 
@@ -171,22 +171,24 @@ The five-rating floor prevents extremely sparse movies from receiving unstable, 
 
 For a request for `n` results, the primary model generates:
 
-`min(200, max(n * 8, 40))`
+`min(240, max(n * 10, 60))`
 
-For a typical top-10 request, this means an 80-item primary pool.
+For a typical top-10 request, this means a 100-item primary pool.
 
-When applicable, the system also adds:
+When the selected model produces candidates, only that model's candidates enter the final reranker. This keeps each For You tab honest and prevents supplemental content/popularity pools from collapsing every tab into the same shelf.
 
-- At least 40 content candidates (`max(n * 4, 24)`)
-- At least 30 popularity/genre candidates (`max(n * 3, 20)`)
+If the selected model cannot produce candidates after the user has supplied signal, the system falls back through:
 
-The larger candidate pool allows reranking to improve quality and diversity without requiring each source model to produce the final ordering.
+- Content candidates, when ratings/preferences exist (`max(n * 4, 24)`)
+- Popularity/genre candidates (`max(n * 3, 20)`)
+
+The larger primary pool allows reranking to improve quality and diversity while preserving the selected model's identity.
 
 ### 2.4 Cold-start behavior
 
-If the user has no watched or disliked movies, the ensemble returns Bayesian popularity candidates. This avoids pretending to personalize without evidence.
+If the user has no watched or disliked movies, only the Popular tab returns Bayesian popularity candidates. Personalized and neural tabs return no picks until the user supplies taste signal. This avoids pretending to personalize without evidence.
 
-As soon as the user supplies ratings or watched history, the selected personalized candidate generator is activated and receives content/popularity supplements.
+As soon as the user supplies ratings or watched history, the selected personalized candidate generator is activated and owns its tab when it can produce candidates.
 
 ### 2.5 Shared score normalization
 
@@ -194,7 +196,7 @@ Candidate scores from different models are not directly comparable. For example,
 
 Therefore, scores are min-max normalized independently within each source model.
 
-Source multipliers are then applied:
+Source multipliers are then applied for the rare fallback pool that mixes sources:
 
 - Selected primary model: 1.00
 - Supplemental content model: 0.94
@@ -467,7 +469,7 @@ Ratings at or below 2.5 do not add positive affinity. For every rating above 2.5
 
 `cluster_affinity += rating - 2.5`
 
-Recommendations may come from the user's three strongest clusters. Within those clusters, Bayesian popularity is adjusted by normalized cluster affinity.
+Recommendations may come from the user's three strongest clusters. Within those clusters, the score favors cluster affinity first, then Bayesian quality, then moderate novelty. This keeps Taste neighborhoods exploratory instead of duplicating the Popular tab.
 
 ### 6.6 Artifact
 
@@ -902,7 +904,7 @@ Interpretation:
 - Collaborative provides strong genre diversity while leading primary ranking metrics.
 - Content reaches the largest unique portion of the catalog.
 - Taste neighborhoods recommend the least popular material on average but have the weakest diversity and ranking quality.
-- Popularity is more diverse than its name might imply because the reranker supplements and diversifies its final list.
+- Popularity is more diverse than its name might imply because the reranker applies a diversity pass to its final list.
 - Absolute catalog coverage remains low and should be understood in the context of only 10,000 total recommendation slots and an 87,585-movie denominator.
 
 ## 13. Industry and research context
@@ -1071,7 +1073,7 @@ Why:
 
 ### 17.2 Content-based
 
-Status: production supplemental model and `more like this` model.
+Status: production personalized tab and `more like this` model.
 
 Why:
 

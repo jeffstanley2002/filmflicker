@@ -130,7 +130,15 @@ def recommend_for_profile(profile, artifacts: dict, pop_df, n: int = 10, exclude
     ].copy()
     candidates["cluster_id"] = candidates["movieId"].map(label_by_movie)
     candidates["cluster_affinity"] = candidates["cluster_id"].map(scores) / max_affinity
-    candidates["profile_score"] = candidates["weighted_score"] * (1.0 + 0.18 * candidates["cluster_affinity"])
+    quality = candidates["weighted_score"].astype(float)
+    quality = (quality - quality.min()) / (quality.max() - quality.min()) if quality.max() > quality.min() else 1.0
+    counts = np.log1p(candidates["count"].astype(float))
+    novelty = 1.0 - ((counts - counts.min()) / (counts.max() - counts.min())) if counts.max() > counts.min() else 0.0
+    candidates["profile_score"] = (
+        0.58 * candidates["cluster_affinity"].astype(float)
+        + 0.25 * quality
+        + 0.17 * novelty
+    )
     candidates = candidates.sort_values("profile_score", ascending=False).head(n)
     return [Recommendation(
         movie_id=int(row.movieId),

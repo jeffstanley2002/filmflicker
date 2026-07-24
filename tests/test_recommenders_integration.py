@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from src import data_utils
-from src.recommenders import clustering, collaborative, content_based, neural, popularity
+from src.recommenders import clustering, collaborative, content_based, ensemble, neural, popularity
 from src.recommenders.base import low_signal_movie_ids
 
 
@@ -40,12 +40,130 @@ def sample_rated(pop_df):
     return {top[0]: 5.0, top[1]: 4.5, top[2]: 2.0}
 
 
+@pytest.fixture(scope="module")
+def recommender_artifacts():
+    return {
+        "content_based": content_based.load(),
+        "collaborative": collaborative.load(),
+        "clustering": clustering.load(),
+        "neural": neural.load(),
+    }
+
+
 def test_low_signal_movie_ids_excludes_sparse_items(pop_df):
     low = low_signal_movie_ids(pop_df, min_count=5)
     sparse = pop_df[pop_df["count"] < 5]["movieId"]
     well_rated = pop_df[pop_df["count"] >= 5]["movieId"]
     assert set(sparse) == low
     assert set(well_rated).isdisjoint(low)
+
+
+def test_ensemble_tabs_use_the_selected_model_source(movies, pop_df, low_signal, sample_rated, recommender_artifacts):
+    movies_indexed = movies.set_index("movieId", drop=False)
+    watched = set(sample_rated)
+    outputs = {
+        model: ensemble.recommend(
+            model=model,
+            n=12,
+            rated=sample_rated,
+            watched_ids=watched,
+            disliked_ids=set(),
+            movies_df=movies_indexed,
+            pop_df=pop_df,
+            low_signal=low_signal,
+            artifacts=recommender_artifacts,
+        )
+        for model in ("popularity", "content_based", "collaborative", "clustering", "neural")
+    }
+
+    for model, recs in outputs.items():
+        assert len(recs) == 12
+        assert {rec.source_model or rec.model for rec in recs} == {model}
+        assert all(rec.model == model for rec in recs)
+
+    recommendation_sets = {model: {rec.movie_id for rec in recs} for model, recs in outputs.items()}
+    assert len({frozenset(movie_ids) for movie_ids in recommendation_sets.values()}) == len(recommendation_sets)
+    assert len(recommendation_sets["popularity"] & recommendation_sets["clustering"]) <= 4
+
+
+def test_ensemble_cold_start_only_popularity_returns_recommendations(movies, pop_df, low_signal, recommender_artifacts):
+    movies_indexed = movies.set_index("movieId", drop=False)
+
+    for model in ("content_based", "collaborative", "clustering", "neural"):
+        recs = ensemble.recommend(
+            model=model,
+            n=5,
+            rated={},
+            watched_ids=set(),
+            disliked_ids=set(),
+            movies_df=movies_indexed,
+            pop_df=pop_df,
+            low_signal=low_signal,
+            artifacts=recommender_artifacts,
+        )
+        assert recs == []
+
+    popular = ensemble.recommend(
+        model="popularity",
+        n=5,
+        rated={},
+        watched_ids=set(),
+        disliked_ids=set(),
+        movies_df=movies_indexed,
+        pop_df=pop_df,
+        low_signal=low_signal,
+        artifacts=recommender_artifacts,
+    )
+    assert len(popular) == 5
+    assert {rec.source_model or rec.model for rec in popular} == {"popularity"}
+
+
+def test_ensemble_extra_excludes_do_not_become_negative_preferences(
+    movies, pop_df, low_signal, sample_rated, recommender_artifacts
+):
+    movies_indexed = movies.set_index("movieId", drop=False)
+    watched = set(sample_rated)
+    held_aside = {int(pop_df.sort_values("weighted_score", ascending=False).iloc[8].movieId)}
+
+    baseline = ensemble.recommend(
+        model="collaborative",
+        n=8,
+        rated=sample_rated,
+        watched_ids=watched,
+        disliked_ids=set(),
+        movies_df=movies_indexed,
+        pop_df=pop_df,
+        low_signal=low_signal,
+        artifacts=recommender_artifacts,
+    )
+    with_extra_exclude = ensemble.recommend(
+        model="collaborative",
+        n=8,
+        rated=sample_rated,
+        watched_ids=watched,
+        disliked_ids=set(),
+        movies_df=movies_indexed,
+        pop_df=pop_df,
+        low_signal=low_signal,
+        artifacts=recommender_artifacts,
+        extra_exclude_ids=held_aside,
+    )
+    as_negative_preference = ensemble.recommend(
+        model="collaborative",
+        n=8,
+        rated=sample_rated,
+        watched_ids=watched,
+        disliked_ids=held_aside,
+        movies_df=movies_indexed,
+        pop_df=pop_df,
+        low_signal=low_signal,
+        artifacts=recommender_artifacts,
+    )
+
+    assert held_aside.isdisjoint({rec.movie_id for rec in with_extra_exclude})
+    baseline_without_held = [rec.movie_id for rec in baseline if rec.movie_id not in held_aside]
+    assert [rec.movie_id for rec in with_extra_exclude[: len(baseline_without_held)]] == baseline_without_held
+    assert [rec.movie_id for rec in as_negative_preference] != [rec.movie_id for rec in with_extra_exclude]
 
 
 class TestContentBased:
