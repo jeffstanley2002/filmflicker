@@ -221,6 +221,7 @@ export function AppShell({
             <div className="profile-avatar"><Sparkles size={16} /></div>
             <div className="profile-copy">
               <strong>{name}</strong>
+              <small>{email}</small>
               <span>{badge.label}</span>
             </div>
             <div className="profile-popover" id="taste-badge-popover" role="tooltip">

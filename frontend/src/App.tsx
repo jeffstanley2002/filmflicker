@@ -1,8 +1,9 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
+import { BackendWakeNotice, type BackendWakeState } from "./components/BackendWakeNotice";
 import { Loading } from "./components/Loading";
 import { warmApi } from "./lib/api";
 import { supabase } from "./lib/supabase";
@@ -50,9 +51,33 @@ function RequireAuth({ session, children }: { session: Session | null; children:
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [backendWakeState, setBackendWakeState] = useState<BackendWakeState>("idle");
   const clearingInvalidSession = useRef(false);
   const lastWakePing = useRef(0);
   const navigate = useNavigate();
+
+  const startBackendWarmup = useCallback((signal?: AbortSignal) => {
+    const slowTimer = window.setTimeout(() => setBackendWakeState("slow"), 2_500);
+    setBackendWakeState("warming");
+    return warmApi(signal)
+      .then(() => {
+        if (!signal?.aborted) setBackendWakeState("ready");
+      })
+      .catch(() => {
+        if (!signal?.aborted) setBackendWakeState("slow");
+      })
+      .finally(() => {
+        window.clearTimeout(slowTimer);
+      });
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void startBackendWarmup(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [startBackendWarmup]);
 
   useEffect(() => {
     if (!supabase) {
@@ -125,9 +150,7 @@ export function App() {
       void supabase?.auth.getSession().then(({ data }) => {
         if (!controller.signal.aborted) setSession(isConfirmedSession(data.session) ? data.session : null);
       });
-      void warmApi(controller.signal).catch(() => {
-        // The next page request will show a user-facing message if Render is still waking.
-      });
+      void startBackendWarmup(controller.signal);
     };
 
     wakeIfStale();
@@ -138,7 +161,7 @@ export function App() {
       window.removeEventListener("focus", wakeIfStale);
       document.removeEventListener("visibilitychange", wakeIfStale);
     };
-  }, [session]);
+  }, [session, startBackendWarmup]);
 
   async function signOut() {
     const result = await supabase?.auth.signOut();
@@ -147,7 +170,14 @@ export function App() {
     navigate("/");
   }
 
-  if (loading) return <Loading label="Opening FilmFlicker" />;
+  if (loading) {
+    return (
+      <>
+        <Loading label="Opening FilmFlicker" />
+        <BackendWakeNotice state={backendWakeState} />
+      </>
+    );
+  }
 
   const token = session?.access_token ?? "";
   const email = session?.user.email ?? "Signed in";
@@ -168,6 +198,7 @@ export function App() {
 
   return (
     <Suspense fallback={null}>
+    <BackendWakeNotice state={backendWakeState} />
     <Routes>
       <Route path="/" element={session ? <Navigate to="/app/browse" replace /> : <LandingPage />} />
       <Route path="/auth" element={<Navigate to={session ? "/app/browse" : "/signin"} replace />} />
