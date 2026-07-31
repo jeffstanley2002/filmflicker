@@ -1,6 +1,6 @@
 import { Award, BarChart3, Bookmark, Check, ChevronLeft, ChevronRight, Heart, LogOut, Pencil, Radar, Search, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet } from "react-router";
 import { BrandMark } from "./BrandMark";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { getAnalytics } from "../lib/api";

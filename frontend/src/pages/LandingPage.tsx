@@ -18,7 +18,7 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { BrandMark } from "../components/BrandMark";
 
 const recommenderStack = [

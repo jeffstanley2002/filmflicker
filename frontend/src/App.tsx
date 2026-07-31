@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate } from "react-router";
 import { AppShell } from "./components/AppShell";
 import { BackendWakeNotice, type BackendWakeState } from "./components/BackendWakeNotice";
 import { Loading } from "./components/Loading";

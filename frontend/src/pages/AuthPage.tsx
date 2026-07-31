@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { ArrowRight, CheckCircle2, Lock, Mail, Sparkles, User, UserPlus } from "lucide-react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { BackButton } from "../components/BackButton";
 import { BrandMark } from "../components/BrandMark";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";

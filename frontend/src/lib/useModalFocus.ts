@@ -10,7 +10,7 @@ const focusableSelector = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
-export function useModalFocus(open: boolean, container: RefObject<HTMLElement>, onClose: () => void, busy = false) {
+export function useModalFocus(open: boolean, container: RefObject<HTMLElement | null>, onClose: () => void, busy = false) {
   useEffect(() => {
     if (!open || !container.current) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
