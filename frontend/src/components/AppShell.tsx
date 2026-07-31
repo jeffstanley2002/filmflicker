@@ -1,6 +1,6 @@
 import { Award, BarChart3, Bookmark, Check, ChevronLeft, ChevronRight, Heart, LogOut, Pencil, Radar, Search, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet } from "react-router";
 import { BrandMark } from "./BrandMark";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { getAnalytics } from "../lib/api";
@@ -221,6 +221,7 @@ export function AppShell({
             <div className="profile-avatar"><Sparkles size={16} /></div>
             <div className="profile-copy">
               <strong>{name}</strong>
+              <small>{email}</small>
               <span>{badge.label}</span>
             </div>
             <div className="profile-popover" id="taste-badge-popover" role="tooltip">

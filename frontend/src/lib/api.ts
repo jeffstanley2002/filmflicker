@@ -40,7 +40,7 @@ function isWakeRetryable(error: unknown) {
 }
 
 function wakeErrorMessage() {
-  return "FilmFlicker is waking up after being idle. Try again in a moment if this does not load automatically.";
+  return "FilmFlicker's portfolio backend is waking up on Render's free tier. This can take about a minute after idle time; retry in a moment if it does not load automatically.";
 }
 
 function delay(ms: number, signal?: AbortSignal) {
