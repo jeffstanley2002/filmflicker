@@ -140,14 +140,14 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .divider-label::before, .divider-label::after { content: ""; height: 1px; background: #d8ded8; }
 .auth-footnote { font-size: 12px; color: #6b756e !important; margin-bottom: 0; }
 
-.app-shell { min-height: 100vh; display: grid; grid-template-columns: 276px minmax(0, 1fr); background: #f7faf7; }
-.sidebar { background: linear-gradient(180deg, #17201c 0%, #10231f 100%); color: white; padding: 22px; display: flex; flex-direction: column; gap: 28px; position: sticky; top: 0; height: 100vh; }
+.app-shell { height: 100vh; height: 100dvh; display: grid; grid-template-columns: 276px minmax(0, 1fr); background: #f7faf7; overflow: hidden; }
+.sidebar { background: linear-gradient(180deg, #17201c 0%, #10231f 100%); color: white; padding: 22px; display: flex; flex-direction: column; gap: 28px; height: 100vh; height: 100dvh; }
 .sidebar nav { display: grid; gap: 8px; }
 .sidebar nav a { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; color: #dbe7e1; }
 .sidebar nav a.active, .sidebar nav a:hover { background: rgba(255,255,255,0.1); color: white; }
 .sidebar-user { margin-top: auto; display: grid; gap: 10px; color: #dbe7e1; word-break: break-word; }
 .sidebar-user .ghost-button { color: white; justify-content: flex-start; padding-left: 0; }
-.app-main { padding: 34px; min-width: 0; position: relative; }
+.app-main { min-height: 0; padding: 34px; min-width: 0; overflow-y: auto; position: relative; }
 .page { max-width: 1440px; margin: 0 auto; }
 .page-header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 24px; position: relative; padding: 18px 0 18px 18px; }
 .page-header::before { content: ""; position: absolute; left: 0; top: 20px; bottom: 20px; width: 5px; border-radius: 999px; background: linear-gradient(180deg, #0f766e, #f59e0b, #be123c); box-shadow: 0 10px 22px rgba(15,118,110,0.16); }
@@ -548,6 +548,7 @@ a, .custom-select, .movie-card, .feature-band article, .chart-panel, .model-opti
 
 @media (max-width: 980px) {
   .hero, .app-shell, .app-shell.sidebar-collapsed, .auth-page { grid-template-columns: 1fr; }
+  .app-shell, .app-shell.sidebar-collapsed { height: auto; min-height: 100vh; overflow: visible; }
   .auth-side, .auth-art { display: none; }
   .sidebar { position: static; height: auto; width: auto !important; }
   .sidebar-collapsed .sidebar .brand span:last-child, .sidebar-collapsed .sidebar nav span, .sidebar-collapsed .profile-copy, .sidebar-collapsed .sidebar-user .ghost-button span { opacity: 1; width: auto; pointer-events: auto; }
