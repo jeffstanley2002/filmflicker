@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generation_id": "3b8a5409-473b-45fc-9f22-f17398bcc4fa",
-  "published_at": "2026-07-24T07:24:09.412735+00:00",
+  "published_at": "2026-08-02T03:41:17.066866+00:00",
   "checksums": {
     "popularity.csv": "f3dcae7272cf970532bedb14a692dbffb62ebd78bd38ec86e3a9a1a2f3fc136c",
     "content_tfidf_vectorizer.joblib": "9cd2f01f52d0866d9e2b815e640a9ac72d0a2d93ec1bcd2b1a573dba8fa78960",
@@ -9,8 +9,8 @@
     "content_movie_ids.npy": "f2090c0a97cfb6926b8a432d6e10d910b614f9b6e378cdefdee3fcb5d7008035",
     "collaborative_svd.joblib": "1ece8fe6f987759193a08e8ef1dad01c7bec6e8f10bb2e595e67444ecc34002f",
     "clustering.joblib": "eec4dc85f92903b058c451eb1b3e48b3dca4b30609f0dff2af2633b8f4186636",
-    "neural_weights.npz": "4a3ec978ed8fc4c015e394c14e8dfc9df330a0c697e268bdcac82caef4803883",
-    "metrics.json": "88d0be1315b833276e266529ca2e6e5cd855f7ab3d8d467da341c91a1b71fecb"
+    "neural_weights.npz": "15f225ad23062c61ed8629b3618d3adc57804bdc25c906b33ec4f21831af92a8",
+    "metrics.json": "3ef0366b13f7a1d089015b7e57e6724a925bf86a2e23f4e0fd7238a34060a552"
   },
   "catalog_manifest_sha256": "4c6820cabb2539502d895e31588ec56d7025b9078b04d8ce684eeb938f052554",
   "config": {
@@ -19,6 +19,8 @@
     "profile_baseline_strength": 3.0,
     "neural_mode": "two_tower",
     "neural_epochs": 8,
-    "neural_sample_size": 1000000
+    "neural_sample_size": null,
+    "neural_training_ratings": 32000204,
+    "neural_training_dataset": "MovieLens 32M"
   }
 }

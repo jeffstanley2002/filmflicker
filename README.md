@@ -111,17 +111,17 @@ Every API query is scoped by the verified Supabase JWT subject, so users only re
 
 ## Model Metrics
 
-Current metrics are generated from `models/metrics.json` using a per-user temporal holdout of each user's latest interactions. The committed metrics file contains the 1,000-user release gate over complete histories.
+Current metrics are generated from `models/metrics.json` using a per-user temporal holdout of each user's latest interactions. The committed metrics file contains the full-32M, 1,000-user release gate over complete histories.
 
 | Model | RMSE | Precision@10 | Recall@10 | Hit Rate@10 | NDCG@10 | Diversity |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Collaborative hybrid | 0.907 | 1.40% | 4.07% | 12.2% | 3.08% | 78.8% |
-| Content-based | - | 1.27% | 3.55% | 11.3% | 3.02% | 69.1% |
-| Popularity | - | 1.11% | 3.14% | 10.0% | 2.29% | 69.6% |
-| Taste embeddings | 0.960 | 1.30% | 3.93% | 11.2% | 2.79% | 76.4% |
-| Taste neighborhoods | - | 1.03% | 3.14% | 9.4% | 2.19% | 66.6% |
+| Content-based | - | **1.50%** | **4.30%** | **12.5%** | **3.28%** | 54.6% |
+| Collaborative hybrid | **0.899** | 1.00% | 2.83% | 9.0% | 2.10% | **86.6%** |
+| Taste embeddings | 0.966 | 0.63% | 1.77% | 5.6% | 1.23% | 80.2% |
+| Popularity | - | 0.17% | 0.44% | 1.7% | 0.43% | 56.7% |
+| Taste neighborhoods | - | 0.00% | 0.00% | 0.0% | 0.00% | 60.0% |
 
-Taste embeddings are now a genuine two-tower neural recommender trained from ratings, not an SVD-derived fallback. In the release-gate evaluation they overlap collaborative on only 43.0% of top-10 items, proving they contribute different candidate signal. Collaborative remains the stronger primary recommender on both rating prediction and top-10 ranking metrics.
+Taste embeddings are now a genuine two-tower neural recommender trained from all 32,000,204 ratings, not an SVD-derived fallback. In the release-gate evaluation they overlap collaborative on only 17.3% of top-10 items, proving they contribute different candidate signal. Content-based matching is now the strongest top-10 recommender, while collaborative remains the stronger rating-prediction model.
 
 Tune only on the chronological validation split:
 
@@ -132,7 +132,7 @@ python scripts/tune_models.py --max-ratings 1000000 --n-validation-users 200
 Regenerate the untouched final metrics with:
 
 ```bash
-python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 1000000 --neural-epochs 8
+FILMFLICKER_DATA_DIR=data/ml-32m python scripts/evaluate_models.py --max-ratings 0 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 32000204 --neural-epochs 8
 ```
 
 Validate exported model artifacts before deployment:
@@ -171,8 +171,8 @@ The free MovieLens 32M catalog currently reaches 2023. Very new releases should 
 ```bash
 python scripts/tune_models.py --max-ratings 1000000 --n-validation-users 200
 # Promote the validation winner in collaborative.py and ranking.py, then:
-python scripts/train_models.py --neural-sample-size 1000000 --neural-epochs 8
-python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 1000000 --neural-epochs 8
+FILMFLICKER_DATA_DIR=data/ml-32m python scripts/train_models.py --neural-sample-size 32000204 --neural-epochs 8
+FILMFLICKER_DATA_DIR=data/ml-32m python scripts/evaluate_models.py --max-ratings 0 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 32000204 --neural-epochs 8
 python scripts/validate_model_export.py
 ```
 

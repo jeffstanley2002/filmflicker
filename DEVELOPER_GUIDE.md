@@ -76,8 +76,8 @@ Watchlist items are passed as extra exclusions only. Do not merge them into disl
 
 ```bash
 backend/.venv/bin/python scripts/tune_models.py --max-ratings 1000000 --n-validation-users 200
-backend/.venv/bin/python scripts/train_models.py --neural-sample-size 1000000 --neural-epochs 8
-backend/.venv/bin/python scripts/evaluate_models.py --max-ratings 1000000 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 1000000 --neural-epochs 8
+FILMFLICKER_DATA_DIR=data/ml-32m backend/.venv/bin/python scripts/train_models.py --neural-sample-size 32000204 --neural-epochs 8
+FILMFLICKER_DATA_DIR=data/ml-32m backend/.venv/bin/python scripts/evaluate_models.py --max-ratings 0 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 32000204 --neural-epochs 8
 backend/.venv/bin/python scripts/validate_model_export.py
 ```
 
