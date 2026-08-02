@@ -1,161 +1,161 @@
 {
-  "generated_at": "2026-07-24T07:24:09.324751+00:00",
-  "data_dir": "/Users/jeffrey/Desktop/proj/data/processed",
+  "generated_at": "2026-08-02T03:41:16.993222+00:00",
+  "data_dir": "data/ml-32m",
   "k": 10,
   "n_eval_users": 1000,
   "original_rating_count": 32000204,
-  "evaluated_rating_count": 999874,
-  "train_rating_count": 968259,
-  "test_rating_count": 31615,
-  "rating_prediction_sample_size": 31615,
+  "evaluated_rating_count": 32000204,
+  "train_rating_count": 31000868,
+  "test_rating_count": 999336,
+  "rating_prediction_sample_size": 100000,
   "rating_prediction": {
     "collaborative": {
-      "rmse": 0.9070822062783491,
-      "mae": 0.6777608349348321
+      "rmse": 0.8993453215818372,
+      "mae": 0.6715868375244652
     },
     "neural": {
-      "rmse": 0.9599754454851575,
-      "mae": 0.7268206086041825
+      "rmse": 0.9656361387144919,
+      "mae": 0.7452623508094612
     }
   },
   "top_n": {
     "popularity": {
-      "precision_at_10": 0.011100000000000002,
-      "recall_at_10": 0.0314,
-      "hit_rate_at_10": 0.1,
-      "ndcg_at_10": 0.022874807171201845,
-      "mrr_at_10": 0.03563015873015873,
-      "intra_list_diversity": 0.6962116315474649,
-      "mean_novelty_bits": 12.648224358100327,
-      "catalog_coverage": 0.009396586173431525,
+      "precision_at_10": 0.0017000000000000001,
+      "recall_at_10": 0.004449999999999999,
+      "hit_rate_at_10": 0.017,
+      "ndcg_at_10": 0.004282981913540154,
+      "mrr_at_10": 0.008673412698412698,
+      "intra_list_diversity": 0.566951207033707,
+      "mean_novelty_bits": 15.906049811422251,
+      "catalog_coverage": 0.0024205057943711824,
       "confidence_intervals_95": {
         "precision_at_10": [
-          0.008945784340157862,
-          0.013254215659842142
+          0.0008983689200209437,
+          0.0025016310799790566
         ],
         "recall_at_10": [
-          0.024905321800973587,
-          0.03789467819902641
+          0.002265436802081699,
+          0.006634563197918299
         ],
         "hit_rate_at_10": [
-          0.08139650328325103,
-          0.11860349671674898
+          0.008983689200209437,
+          0.025016310799790567
         ],
         "ndcg_at_10": [
-          0.018069947529157443,
-          0.027679666813246247
+          0.001957317804549056,
+          0.006608646022531252
         ]
       }
     },
     "content_based": {
-      "precision_at_10": 0.012700000000000001,
-      "recall_at_10": 0.03553333333333333,
-      "hit_rate_at_10": 0.113,
-      "ndcg_at_10": 0.030210478543487178,
-      "mrr_at_10": 0.05249722222222222,
-      "intra_list_diversity": 0.6910540919574253,
-      "mean_novelty_bits": 12.535739231921394,
-      "catalog_coverage": 0.011862761888451218,
+      "precision_at_10": 0.015,
+      "recall_at_10": 0.04301666666666667,
+      "hit_rate_at_10": 0.125,
+      "ndcg_at_10": 0.032765713914396366,
+      "mrr_at_10": 0.05185873015873016,
+      "intra_list_diversity": 0.5463907912457912,
+      "mean_novelty_bits": 14.728893864467437,
+      "catalog_coverage": 0.023017640006850488,
       "confidence_intervals_95": {
         "precision_at_10": [
-          0.010389110875757009,
-          0.015010889124242994
+          0.01232917591344894,
+          0.01767082408655106
         ],
         "recall_at_10": [
-          0.028684345040894565,
-          0.0423823216257721
+          0.035033615021127035,
+          0.0509997183122063
         ],
         "hit_rate_at_10": [
-          0.09336755638127432,
-          0.13263244361872567
+          0.10449157257136482,
+          0.14550842742863518
         ],
         "ndcg_at_10": [
-          0.0239852244691076,
-          0.036435732617866756
+          0.026405797384893893,
+          0.03912563044389884
         ]
       }
     },
     "collaborative": {
-      "precision_at_10": 0.014,
-      "recall_at_10": 0.04073333333333334,
-      "hit_rate_at_10": 0.122,
-      "ndcg_at_10": 0.030826673484280306,
-      "mrr_at_10": 0.04881111111111111,
-      "intra_list_diversity": 0.7883906014972681,
-      "mean_novelty_bits": 11.167471062140274,
-      "catalog_coverage": 0.008380430439002112,
+      "precision_at_10": 0.01,
+      "recall_at_10": 0.028300000000000002,
+      "hit_rate_at_10": 0.09,
+      "ndcg_at_10": 0.020983867835189934,
+      "mrr_at_10": 0.03363809523809524,
+      "intra_list_diversity": 0.8656007054673721,
+      "mean_novelty_bits": 11.360955384980727,
+      "catalog_coverage": 0.0029000399611805675,
       "confidence_intervals_95": {
         "precision_at_10": [
-          0.011547597774288102,
-          0.0164524022257119
+          0.007943306053397835,
+          0.012056693946602165
         ],
         "recall_at_10": [
-          0.033167031475973587,
-          0.04829963519069309
+          0.0222064983461829,
+          0.034393501653817105
         ],
         "hit_rate_at_10": [
-          0.10170446516264392,
-          0.14229553483735607
+          0.0722533951984617,
+          0.10774660480153829
         ],
         "ndcg_at_10": [
-          0.024883941982869022,
-          0.03676940498569159
+          0.016122480349383725,
+          0.025845255320996144
         ]
       }
     },
     "clustering": {
-      "precision_at_10": 0.0103,
-      "recall_at_10": 0.03136666666666667,
-      "hit_rate_at_10": 0.094,
-      "ndcg_at_10": 0.02188624207327805,
-      "mrr_at_10": 0.033049603174603176,
-      "intra_list_diversity": 0.6655601710943377,
-      "mean_novelty_bits": 12.808232314682057,
-      "catalog_coverage": 0.006976080379060341,
+      "precision_at_10": 0.0,
+      "recall_at_10": 0.0,
+      "hit_rate_at_10": 0.0,
+      "ndcg_at_10": 0.0,
+      "mrr_at_10": 0.0,
+      "intra_list_diversity": 0.5996199470899471,
+      "mean_novelty_bits": 21.833138876562973,
+      "catalog_coverage": 0.0019295541473996689,
       "confidence_intervals_95": {
         "precision_at_10": [
-          0.008239653989815866,
-          0.012360346010184134
+          0.0,
+          0.0
         ],
         "recall_at_10": [
-          0.024318790777870296,
-          0.03841454255546304
+          0.0,
+          0.0
         ],
         "hit_rate_at_10": [
-          0.07590321807845617,
-          0.11209678192154383
+          0.0,
+          0.0
         ],
         "ndcg_at_10": [
-          0.017061694536886073,
-          0.02671078960967003
+          0.0,
+          0.0
         ]
       }
     },
     "neural": {
-      "precision_at_10": 0.013,
-      "recall_at_10": 0.03925,
-      "hit_rate_at_10": 0.112,
-      "ndcg_at_10": 0.02788710741373091,
-      "mrr_at_10": 0.04179801587301587,
-      "intra_list_diversity": 0.763967327271494,
-      "mean_novelty_bits": 11.541395376043278,
-      "catalog_coverage": 0.007866643831706342,
+      "precision_at_10": 0.0063,
+      "recall_at_10": 0.01771666666666667,
+      "hit_rate_at_10": 0.056,
+      "ndcg_at_10": 0.01229786666013511,
+      "mrr_at_10": 0.016577777777777775,
+      "intra_list_diversity": 0.8022487654320988,
+      "mean_novelty_bits": 11.192211569283616,
+      "catalog_coverage": 0.001564194782211566,
       "confidence_intervals_95": {
         "precision_at_10": [
-          0.010605514844656754,
-          0.015394485155343245
+          0.004601389929332758,
+          0.007998610070667243
         ],
         "recall_at_10": [
-          0.03128922224806212,
-          0.04721077775193788
+          0.012542311921631119,
+          0.02289102141170222
         ],
         "hit_rate_at_10": [
-          0.09244360405846153,
-          0.13155639594153848
+          0.04174217309587369,
+          0.07025782690412631
         ],
         "ndcg_at_10": [
-          0.02223989735380229,
-          0.03353431747365952
+          0.00811545284588284,
+          0.016480280474387383
         ]
       }
     }
@@ -174,42 +174,42 @@
       }
     },
     "rating_prediction": {
-      "rmse": 0.908921075802697,
-      "mae": 0.6820277024341338
+      "rmse": 0.9042763567476035,
+      "mae": 0.6783718308155601
     },
     "top_n": {
-      "precision_at_10": 0.0134,
-      "recall_at_10": 0.04065,
-      "hit_rate_at_10": 0.116,
-      "ndcg_at_10": 0.030208508145724594
+      "precision_at_10": 0.007000000000000001,
+      "recall_at_10": 0.022516666666666664,
+      "hit_rate_at_10": 0.062,
+      "ndcg_at_10": 0.015223718710290449
     },
     "paired_delta_tuned_minus_previous": {
       "precision_at_10": {
-        "mean": 0.0006000000000000002,
+        "mean": 0.0030000000000000005,
         "confidence_interval_95": [
-          -0.0013801439326458051,
-          0.0025801439326458057
+          0.0011698680421939566,
+          0.004830131957806044
         ]
       },
       "recall_at_10": {
-        "mean": 8.333333333333393e-05,
+        "mean": 0.005783333333333333,
         "confidence_interval_95": [
-          -0.006398044625799896,
-          0.006564711292466563
+          -0.001266248540834852,
+          0.012832915207501518
         ]
       },
       "hit_rate_at_10": {
-        "mean": 0.006,
+        "mean": 0.028,
         "confidence_interval_95": [
-          -0.011535598067918857,
-          0.023535598067918856
+          0.011685394520493244,
+          0.04431460547950676
         ]
       },
       "ndcg_at_10": {
-        "mean": 0.0006181653385557122,
+        "mean": 0.005760149124899483,
         "confidence_interval_95": [
-          -0.004244273642102203,
-          0.005480604319213628
+          0.0002682798430265138,
+          0.011252018406772452
         ]
       }
     }
@@ -217,45 +217,45 @@
   "neural_independence": {
     "training_mode": "two_tower_neural",
     "description": "Taste embeddings are trained by an independent two-tower neural model on train-split ratings. They are not exported from collaborative SVD factors.",
-    "mean_top_k_overlap_with_collaborative": 0.4298,
+    "mean_top_k_overlap_with_collaborative": 0.17310000000000003,
     "paired_delta_neural_minus_collaborative": {
       "precision_at_10": {
-        "mean": -0.0010000000000000002,
+        "mean": -0.0037,
         "confidence_interval_95": [
-          -0.0032521417678606614,
-          0.0012521417678606607
+          -0.00596687167770988,
+          -0.001433128322290121
         ]
       },
       "recall_at_10": {
-        "mean": -0.0014833333333333335,
+        "mean": -0.010583333333333333,
         "confidence_interval_95": [
-          -0.009569395844279615,
-          0.0066027291776129485
+          -0.017824798474038683,
+          -0.003341868192627985
         ]
       },
       "hit_rate_at_10": {
-        "mean": -0.01,
+        "mean": -0.034,
         "confidence_interval_95": [
-          -0.029203599095435684,
-          0.009203599095435685
+          -0.054079140476680825,
+          -0.01392085952331918
         ]
       },
       "ndcg_at_10": {
-        "mean": -0.002939566070549396,
+        "mean": -0.008686001175054822,
         "confidence_interval_95": [
-          -0.008727667447685796,
-          0.0028485353065870037
+          -0.01439647509425069,
+          -0.0029755272558589533
         ]
       },
       "mrr_at_10": {
-        "mean": -0.0070130952380952375,
+        "mean": -0.01706031746031746,
         "confidence_interval_95": [
-          -0.01815514850483597,
-          0.004128958028645495
+          -0.02637063235195542,
+          -0.0077500025686795
         ]
       }
     },
-    "validation_rmse_residual": 0.957301139831543
+    "validation_rmse_residual": 0.892672598361969
   },
   "notes": "Per-user temporal holdout of the latest interactions. Evaluation samples complete user histories. Collaborative, clustering, and independently trained two-tower taste embedding artifacts are retrained on the train split only; content-based and popularity use rating-weighted profiles built from each test user's train-split ratings only. New or cold profiles fall back to popularity."
 }

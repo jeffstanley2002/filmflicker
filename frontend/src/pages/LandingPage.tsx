@@ -25,32 +25,32 @@ const recommenderStack = [
   {
     icon: Radar,
     name: "Collaborative hybrid",
-    role: "Primary ranker",
-    metric: "12.2%",
-    label: "Hit Rate@10",
-    detail: "Learns shared watching patterns and stays the strongest release-gate recommender.",
+    role: "Rating predictor",
+    metric: "0.899",
+    label: "RMSE",
+    detail: "Learns shared watching patterns and remains the strongest rating predictor.",
   },
   {
     icon: Brain,
     name: "Taste embeddings",
     role: "Neural challenger",
-    metric: "43.0%",
+    metric: "17.3%",
     label: "Top-10 overlap",
     detail: "A real two-tower model that contributes different candidate signal from collaborative.",
   },
   {
     icon: Layers3,
     name: "Content TF-IDF",
-    role: "Similarity layer",
-    metric: "5.25%",
-    label: "MRR@10",
-    detail: "Connects movies through genres and tags, especially useful when a profile is still young.",
+    role: "Top-10 leader",
+    metric: "12.5%",
+    label: "Hit Rate@10",
+    detail: "Connects movies through genres and tags and leads the full-32M release gate.",
   },
   {
     icon: Network,
     name: "Taste neighborhoods",
     role: "Discovery map",
-    metric: "12.81",
+    metric: "21.83",
     label: "Novelty bits",
     detail: "Clusters taste lanes for exploration and more readable profile insights.",
   },
@@ -58,7 +58,7 @@ const recommenderStack = [
     icon: BarChart3,
     name: "Popularity baseline",
     role: "Cold-start guard",
-    metric: "10.0%",
+    metric: "1.7%",
     label: "Hit Rate@10",
     detail: "Keeps the app useful before enough ratings exist for personalization.",
   },
@@ -229,8 +229,9 @@ export function LandingPage() {
             <p className="eyebrow">Release posture</p>
             <h2>Validated, honest, and ready to demo.</h2>
             <p>
-              The launch story is intentionally specific: collaborative is the strongest primary recommender, neural
-              taste embeddings are a real independent challenger, and every artifact is checked before serving.
+              The launch story is intentionally specific: content matching leads the top-10 gate, collaborative is
+              strongest for rating prediction, neural taste embeddings are a real independent challenger, and every
+              artifact is checked before serving.
             </p>
           </div>
           <div className="readiness-stack" aria-label="Release verification">

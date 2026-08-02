@@ -9,8 +9,8 @@ router = APIRouter(prefix="/metrics", tags=["metrics"])
 
 MODEL_LABELS = {
     "popularity": ("Crowd favorites", "Best for a brand-new account: trusted hits people consistently rate well."),
-    "content_based": ("Taste match", "Uses genres and tags from movies you liked to find close neighbors."),
-    "collaborative": ("People like you", "Learns patterns from similar rating histories and is strongest in current tests."),
+    "content_based": ("Taste match", "Uses genres and tags from movies you liked and is strongest for top-10 ranking in current tests."),
+    "collaborative": ("People like you", "Learns patterns from similar rating histories and is strongest for rating prediction and diversity."),
     "clustering": ("Taste neighborhoods", "Groups movies into taste clusters and recommends from your strongest cluster."),
     "neural": ("Taste embeddings", "Learns latent movie factors from ratings to estimate user/movie fit."),
 }

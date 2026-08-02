@@ -36,7 +36,7 @@ FilmFlicker contains five recommendation strategies:
 4. KMeans taste neighborhoods
 5. Two-tower neural taste embeddings
 
-These candidate generators share one production ensemble and reranker. The collaborative hybrid is the strongest personalized model, but each For You tab is now served by its selected primary generator when possible. Popularity is the explicit cold-start lane, content matching also powers `more like this`, clustering powers interpretable discovery neighborhoods, and taste embeddings remain a comparison model.
+These candidate generators share one production ensemble and reranker. The full-32M evaluation now shows content-based matching as the strongest top-10 ranker, while the collaborative hybrid remains the strongest star-rating predictor and most diverse personalized model. Each For You tab is served by its selected primary generator when possible. Popularity is the explicit cold-start lane, content matching also powers `more like this`, clustering powers interpretable discovery neighborhoods, and taste embeddings remain a comparison model.
 
 The models were trained on MovieLens 32M:
 
@@ -49,28 +49,29 @@ The models were trained on MovieLens 32M:
 | Latest catalog year | 2023 |
 | TMDB enrichment during this build | Disabled |
 
-The final collaborative configuration was selected on a chronological validation set and evaluated on a separate chronological test set. Production collaborative, popularity, content, and clustering artifacts were then trained from the full catalog inputs. The taste-embedding artifact is now independently trained by a two-tower neural model using the documented one-million-rating sample; validation rejects the old SVD-derived fallback.
+The final collaborative configuration was selected on a chronological validation set and evaluated on a separate chronological test set. Production collaborative, popularity, content, clustering, and taste-embedding artifacts were then trained from the full catalog inputs. The taste-embedding artifact is independently trained by a two-tower neural model on all 32,000,204 ratings; validation rejects the old SVD-derived fallback.
 
-Current committed primary-model results use 1,000 untouched user histories sampled from a one-million-rating complete-history evaluation set.
+Current committed primary-model results use the full MovieLens 32M ratings set with 1,000 untouched user histories sampled from the chronological holdout.
 
-| Metric | Collaborative hybrid |
-| --- | ---: |
-| RMSE | 0.9071 |
-| MAE | 0.6778 |
-| Precision@10 | 1.40% |
-| Recall@10 | 4.07% |
-| Hit Rate@10 | 12.20% |
-| NDCG@10 | 3.08% |
-| MRR@10 | 4.88% |
-| Intra-list diversity | 78.84% |
-| Mean novelty | 11.17 bits |
-| Catalog coverage | 0.84% |
+| Metric | Best model | Value |
+| --- | --- | ---: |
+| RMSE | Collaborative hybrid | 0.8993 |
+| MAE | Collaborative hybrid | 0.6716 |
+| Precision@10 | Content-based | 1.50% |
+| Recall@10 | Content-based | 4.30% |
+| Hit Rate@10 | Content-based | 12.50% |
+| NDCG@10 | Content-based | 3.28% |
+| MRR@10 | Content-based | 5.19% |
+| Intra-list diversity | Collaborative hybrid | 86.56% |
+| Mean novelty | Taste neighborhoods | 21.83 bits |
+| Catalog coverage | Content-based | 2.30% |
 
 The deployment conclusion is:
 
 - Ready for a resume/portfolio deployment with reproducible offline evidence.
-- Ready to use collaborative as the primary model.
-- Ready to use content and popularity as supporting/fallback models.
+- Ready to use content-based matching as the strongest top-10 recommendation tab.
+- Ready to use collaborative as the best rating predictor and a strong diversity-focused personalized tab.
+- Ready to use popularity as the cold-start/fallback model.
 - Ready to use clustering for insights, not as the primary ranker.
 - Not commercially proven because there is no real-user A/B testing, engagement data, or current post-2023 catalog enrichment.
 
@@ -527,7 +528,7 @@ The historical artifact filename remains `neural_weights.npz` for compatibility.
 
 ### 7.5 Intended role
 
-The taste embedding model is deployable as a ranking challenger. In the July 24 release-gate evaluation it overlaps collaborative on only 43.0% of top-10 recommendations, proving it contributes different candidate signal. Collaborative remains the primary recommender because it has lower RMSE, MAE, and stronger top-10 ranking metrics on the larger gate.
+The taste embedding model is deployable as a ranking challenger. In the August 2 full-32M release-gate evaluation it overlaps collaborative on only 17.3% of top-10 recommendations, proving it contributes different candidate signal. Collaborative remains stronger for rating prediction, while content-based matching is stronger for top-10 ranking.
 
 ## 8. Evaluation design
 
@@ -545,9 +546,9 @@ For computationally bounded evaluation:
 - Entire user histories are selected until the requested rating budget is reached.
 - No selected user has only a random subset of their history retained.
 
-The final evaluation sample contained 999,874 of the original 32,000,204 ratings.
+The final evaluation uses all 32,000,204 ratings from MovieLens 32M.
 
-Production artifacts were still trained separately on all 32,000,204 ratings. The one-million-rating sample applies only to reproducible offline model evaluation.
+Production artifacts are trained separately on all 32,000,204 ratings. The neural production artifact also uses all 32,000,204 ratings instead of the earlier one-million-rating sample.
 
 ### 8.3 Outer chronological test split
 
@@ -562,8 +563,8 @@ Final split counts:
 
 | Split | Ratings |
 | --- | ---: |
-| Pre-test training | 968,259 |
-| Untouched test interactions | 31,615 |
+| Pre-test training | 31,000,868 |
+| Untouched test interactions | 999,336 |
 
 ### 8.4 Inner validation split used for tuning
 
@@ -600,7 +601,7 @@ To avoid leakage, evaluation retrains rating-sensitive artifacts on the pre-test
 
 - Collaborative SVD
 - KMeans clustering
-- Latent taste embeddings derived from the evaluation SVD
+- Independent two-tower neural taste embeddings
 - Popularity counts and Bayesian scores
 
 The content model is rating-independent and uses movie metadata/tags, so its production content artifact is loaded directly. Each test user's profile still contains only pre-test ratings.
@@ -609,7 +610,7 @@ The content model is rating-independent and uses movie metadata/tags, so its pro
 
 The final ranking report uses 1,000 randomly sampled eligible users with seed 42.
 
-Rating-prediction RMSE and MAE use all 31,615 held-out rating rows, below the configured cap of 100,000.
+Rating-prediction RMSE and MAE use a 100,000-row sample from the 999,336 held-out rating rows.
 
 ## 9. Metric definitions
 
@@ -649,7 +650,7 @@ Recall measures how much of the known future-like set was recovered by ten recom
 
 Hit Rate is 1 for a user when at least one top-10 recommendation appears in that user's held-out liked set, otherwise 0. The report averages this over users.
 
-A 12.20% Hit Rate@10 means 122 of 1,000 evaluated users received at least one observed future liked movie in their first ten recommendations.
+A 12.50% Hit Rate@10 means 125 of 1,000 evaluated users received at least one observed future liked movie in their first ten recommendations.
 
 ### 9.6 NDCG@10
 
@@ -826,84 +827,84 @@ The complete three-round search took approximately 300.5 seconds in the recorded
 
 ## 12. Final untouched evaluation
 
-The final report was generated at `2026-07-16T01:59:56Z`.
+The final report was generated at `2026-08-02T03:41:16Z`.
 
-Evaluation runtime was approximately 826.5 seconds. This run includes an extra paired pass for the previous configuration.
+Evaluation runtime was approximately 865.4 seconds. This run includes an extra paired pass for the previous collaborative configuration and retrains the independent two-tower neural evaluator on the full pre-test split.
 
 ### 12.1 Final rating-prediction metrics
 
 | Model | RMSE | MAE |
 | --- | ---: | ---: |
-| Collaborative hybrid | 0.9071 | 0.6778 |
-| Taste embeddings | 0.9600 | 0.7268 |
+| Collaborative hybrid | 0.8993 | 0.6716 |
+| Taste embeddings | 0.9656 | 0.7453 |
 
 Interpretation:
 
 - Collaborative has the lower error on both metrics.
-- The average collaborative absolute rating error is approximately 0.68 stars.
-- Taste embeddings are useful for ranking diversity and candidate generation, but they do not beat collaborative as a raw rating predictor.
+- The average collaborative absolute rating error is approximately 0.67 stars.
+- Taste embeddings are independently trained and useful as a distinct challenger, but they do not beat collaborative as a raw rating predictor.
 
 ### 12.2 Final top-10 ranking metrics
 
 | Model | Precision@10 | Recall@10 | Hit Rate@10 | NDCG@10 | MRR@10 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Popularity | 1.11% | 3.14% | 10.0% | 2.29% | 3.56% |
-| Content-based | 1.27% | 3.55% | 11.3% | 3.02% | **5.25%** |
-| Collaborative hybrid | **1.40%** | **4.07%** | **12.2%** | **3.08%** | 4.88% |
-| Taste neighborhoods | 1.03% | 3.14% | 9.4% | 2.19% | 3.30% |
-| Taste embeddings | 1.30% | 3.93% | 11.2% | 2.79% | 4.18% |
+| Popularity | 0.17% | 0.44% | 1.7% | 0.43% | 0.87% |
+| Content-based | **1.50%** | **4.30%** | **12.5%** | **3.28%** | **5.19%** |
+| Collaborative hybrid | 1.00% | 2.83% | 9.0% | 2.10% | 3.36% |
+| Taste neighborhoods | 0.00% | 0.00% | 0.0% | 0.00% | 0.00% |
+| Taste embeddings | 0.63% | 1.77% | 5.6% | 1.23% | 1.66% |
 
-Collaborative leads Precision, Recall, Hit Rate, and NDCG on the 1,000-user gate. Content has the highest MRR, meaning that when it finds a known relevant movie, its first hit tends to appear particularly early. Taste embeddings are independently trained and different, but they do not beat collaborative on this larger gate.
+Content-based matching leads Precision, Recall, Hit Rate, NDCG, and MRR on the 1,000-user full-32M gate. That makes it the best offline top-10 recommendation model under the current protocol. Collaborative remains better for rating prediction and diversity, but it should no longer be described as the strongest top-10 ranker.
 
 ### 12.3 Uncertainty and paired baseline comparison
 
-The July 24 committed evaluation records normal-approximation 95% confidence intervals over 1,000 per-user ranking outcomes. For the collaborative serving strategy:
+The August 2 committed evaluation records normal-approximation 95% confidence intervals over 1,000 per-user ranking outcomes. For the content-based serving strategy:
 
 | Metric | Point estimate | 95% interval |
 | --- | ---: | ---: |
-| Precision@10 | 1.40% | 1.15% to 1.65% |
-| Recall@10 | 4.07% | 3.32% to 4.83% |
-| Hit Rate@10 | 12.20% | 10.17% to 14.23% |
-| NDCG@10 | 3.08% | 2.49% to 3.68% |
+| Precision@10 | 1.50% | 1.23% to 1.77% |
+| Recall@10 | 4.30% | 3.50% to 5.10% |
+| Hit Rate@10 | 12.50% | 10.45% to 14.55% |
+| NDCG@10 | 3.28% | 2.64% to 3.91% |
 
 The previous 32-factor configuration was retrained on the same train split and scored for the same users. The tuned-minus-previous paired deltas were:
 
 | Metric | Mean delta | 95% interval |
 | --- | ---: | ---: |
-| Precision@10 | +0.06 percentage points | -0.14 to +0.26 points |
-| Recall@10 | +0.01 percentage points | -0.64 to +0.66 points |
-| Hit Rate@10 | +0.60 percentage points | -1.15 to +2.35 points |
-| NDCG@10 | +0.06 percentage points | -0.42 to +0.55 points |
+| Precision@10 | +0.30 percentage points | +0.12 to +0.48 points |
+| Recall@10 | +0.58 percentage points | -0.13 to +1.28 points |
+| Hit Rate@10 | +2.80 percentage points | +1.17 to +4.43 points |
+| NDCG@10 | +0.58 percentage points | +0.03 to +1.13 points |
 
-Every paired interval includes zero. The tuned collaborative configuration has slightly better point estimates and lower rating error (RMSE 0.9071 versus 0.9089), but this test does not establish a statistically reliable ranking improvement over the previous configuration. It remains selected because it won the separate validation search and did not regress on rating error.
+The tuned collaborative configuration improves Precision@10, Hit Rate@10, and NDCG@10 over the previous collaborative configuration with intervals above zero; Recall@10 is directionally higher but its interval includes zero. It also has lower rating error (RMSE 0.8993 versus 0.9043).
 
 The neural taste model is also compared pairwise with collaborative:
 
 | Metric | Neural minus collaborative | 95% interval |
 | --- | ---: | ---: |
-| Precision@10 | -0.10 percentage points | -0.33 to +0.13 points |
-| Recall@10 | -0.15 percentage points | -0.96 to +0.66 points |
-| Hit Rate@10 | -1.00 percentage points | -2.92 to +0.92 points |
-| NDCG@10 | -0.29 percentage points | -0.87 to +0.28 points |
-| MRR@10 | -0.70 percentage points | -1.82 to +0.41 points |
+| Precision@10 | -0.37 percentage points | -0.60 to -0.14 points |
+| Recall@10 | -1.06 percentage points | -1.78 to -0.33 points |
+| Hit Rate@10 | -3.40 percentage points | -5.41 to -1.39 points |
+| NDCG@10 | -0.87 percentage points | -1.44 to -0.30 points |
+| MRR@10 | -1.71 percentage points | -2.64 to -0.78 points |
 
-The intervals include zero, so this is not a statistically reliable regression claim either. Taste embeddings remain meaningful because they are independently trained and have different top-10 output, but collaborative is the safer primary recommender on the release gate.
+The neural intervals are below zero against collaborative, so the full-32M gate does show weaker neural top-10 ranking. Taste embeddings remain meaningful because they are independently trained and have different top-10 output, but they are not the best recommender under the current offline protocol.
 
 ### 12.4 Final beyond-accuracy metrics
 
 | Model | Diversity | Mean novelty bits | Catalog coverage |
 | --- | ---: | ---: | ---: |
-| Popularity | 69.62% | 12.65 | 0.94% |
-| Content-based | 69.11% | 12.54 | **1.19%** |
-| Collaborative hybrid | **78.84%** | 11.17 | 0.84% |
-| Taste neighborhoods | 66.56% | **12.81** | 0.70% |
-| Taste embeddings | 76.40% | 11.54 | 0.79% |
+| Popularity | 56.70% | 15.91 | 0.24% |
+| Content-based | 54.64% | 14.73 | **2.30%** |
+| Collaborative hybrid | **86.56%** | 11.36 | 0.29% |
+| Taste neighborhoods | 59.96% | **21.83** | 0.19% |
+| Taste embeddings | 80.22% | 11.19 | 0.16% |
 
 Interpretation:
 
-- Collaborative provides strong genre diversity while leading primary ranking metrics.
-- Content reaches the largest unique portion of the catalog.
-- Taste neighborhoods recommend the least popular material on average but have the weakest diversity and ranking quality.
+- Content provides the strongest ranking metrics and reaches the largest unique portion of the catalog.
+- Collaborative provides the strongest genre diversity and the best rating prediction.
+- Taste neighborhoods recommend the least popular material on average but have the weakest ranking quality.
 - Popularity is more diverse than its name might imply because the reranker applies a diversity pass to its final list.
 - Absolute catalog coverage remains low and should be understood in the context of only 10,000 total recommendation slots and an 87,585-movie denominator.
 
@@ -929,7 +930,7 @@ A 2025 MovieLens 1M baseline study reported approximately 0.8757 RMSE for SVD an
 
 - `Evaluating Recommender System using Baseline Approaches`: https://doi.org/10.1016/j.procs.2025.04.495
 
-FilmFlicker's 0.9071 is somewhat higher, but the figures are not directly comparable because FilmFlicker uses MovieLens 32M sampling and chronological per-user holdout rather than that study's exact data/protocol.
+FilmFlicker's collaborative RMSE of 0.8993 is somewhat higher, but the figures are not directly comparable because FilmFlicker uses the full MovieLens 32M dataset and chronological per-user holdout rather than that study's exact data/protocol.
 
 The serving architecture is consistent with the standard candidate-generation, scoring, and reranking pattern described by Google:
 
@@ -942,7 +943,7 @@ Commercial systems such as Netflix combine offline experimentation with live A/B
 Therefore, the correct claim is:
 
 - FilmFlicker has a reproducibly evaluated, deployment-ready portfolio recommender.
-- Its collaborative hybrid has the strongest ranking point estimates among the included serving strategies under the documented offline protocol.
+- Its content-based model has the strongest top-10 ranking point estimates among the included serving strategies under the documented offline protocol.
 - Its advantage over the previous collaborative configuration is not statistically conclusive in the paired 1,000-user test.
 - It has not been validated for commercial engagement or retention because it has no meaningful live traffic.
 
@@ -956,7 +957,7 @@ After validation selected the winning parameters, the constants were promoted in
 The complete production training command was:
 
 ```bash
-backend/.venv/bin/python scripts/train_models.py --neural-sample-size 1000000 --neural-epochs 8
+FILMFLICKER_DATA_DIR=data/ml-32m backend/.venv/bin/python scripts/train_models.py --neural-sample-size 32000204 --neural-epochs 8
 ```
 
 Training order:
@@ -968,7 +969,7 @@ Training order:
 5. Fit and save the 15-cluster KMeans model and cluster profiles.
 6. Train and export the two-tower neural taste-embedding artifact.
 
-The July 24 full-catalog production training with a one-million-rating neural sample completed in approximately 57.3 seconds on the development machine. Runtime is hardware-dependent and should not be treated as a deployment SLA.
+The August 2 neural production refresh trained the two-tower artifact on all 32,000,204 ratings in approximately 242.8 seconds on the development machine. The full-32M evaluation run completed in approximately 865.4 seconds. Runtime is hardware-dependent and should not be treated as a deployment SLA.
 
 ## 15. Artifact inventory
 
@@ -1060,27 +1061,27 @@ The committed sklearn artifacts were validated with scikit-learn 1.6.1. The depl
 
 ## 17. Deployment roles and recommendation policy
 
-### 17.1 Collaborative hybrid
+### 17.1 Content-based
 
-Status: primary production model.
+Status: strongest top-10 recommendation model and production `more like this` model.
+
+Why:
+
+- Best Precision@10, Recall@10, Hit Rate@10, NDCG@10, and MRR@10 in the full-32M gate.
+- Highest catalog coverage.
+- Works with short profiles.
+- Uses negative preference signals.
+
+### 17.2 Collaborative hybrid
+
+Status: best rating-prediction model and strong diversity-focused personalized tab.
 
 Why:
 
 - Best RMSE and MAE.
-- Best Precision@10, Recall@10, Hit Rate@10, and NDCG@10.
-- Strong 78.84% diversity.
+- Strongest intra-list diversity at 86.56%.
 - Personalized fold-in works for new FilmFlicker users.
-
-### 17.2 Content-based
-
-Status: production personalized tab and `more like this` model.
-
-Why:
-
-- Second-best NDCG and Hit Rate.
-- Highest catalog coverage.
-- Works with short profiles.
-- Uses negative preference signals.
+- Still beats the previous collaborative configuration on the paired full-32M gate.
 
 ### 17.3 Popularity
 
@@ -1099,8 +1100,8 @@ Status: deployable ranking challenger model.
 Why:
 
 - Independently trained two-tower neural recommender.
-- Different top-10 output from collaborative, with 43.0% mean top-10 overlap in the release-gate evaluation.
-- Lower ranking and rating point estimates than collaborative on the 1,000-user gate, so it should not replace collaborative as the primary recommender.
+- Different top-10 output from collaborative, with 17.3% mean top-10 overlap in the full-32M release-gate evaluation.
+- Lower ranking and rating point estimates than collaborative and content-based on the 1,000-user gate, so it should not replace either as the primary recommender.
 
 ### 17.5 Taste neighborhoods
 
@@ -1109,7 +1110,7 @@ Status: production insight/exploration model, not default ranking model.
 Why:
 
 - Human-readable cluster profiles improve Taste Lab.
-- Ranking metrics trail collaborative and content.
+- Ranking metrics trail content, collaborative, popularity, and neural in the full-32M gate.
 - Useful as a different explanatory view rather than an accuracy winner.
 
 ## 18. Known limitations and residual risks
@@ -1132,19 +1133,19 @@ MovieLens ratings are not missing at random. Users are more likely to encounter 
 
 ### 18.5 Coverage concentration
 
-Final catalog coverage is below 1.2% for every model over the 1,000-user test. Some of this follows mathematically from only 10,000 available recommendation slots, but repeated popular candidates also contribute.
+Final catalog coverage is 2.30% for content-based and below 0.30% for every other model over the 1,000-user test. Some of this follows mathematically from only 10,000 available recommendation slots, but repeated popular candidates also contribute.
 
 ### 18.6 Evaluation sampling
 
-The final offline benchmark uses approximately one million complete-history ratings for practical runtime, not all 32 million. Production artifacts are trained on all ratings.
+The final offline benchmark now uses all 32,000,204 ratings, which is more faithful but slower to reproduce. Earlier one-million-rating gates remain useful as development history only.
 
 ### 18.7 No confidence intervals
 
-The final report averages 1,000 users but does not store per-user confidence intervals. The wider cohort is more credible than the earlier 250-user run, but statistical uncertainty remains.
+The final report averages 1,000 users and stores normal-approximation confidence intervals for Precision@10, Recall@10, Hit Rate@10, and NDCG@10. It does not replace online product evaluation.
 
 ### 18.8 Taste embedding role
 
-The final embedding model is independently trained and validated as `two_tower_neural`, but the 1,000-user release gate does not show better results than collaborative. Treat it as a credible challenger and source of different candidates, not as the default or best-performing recommender.
+The final embedding model is independently trained and validated as `two_tower_neural` on all 32,000,204 ratings, but the 1,000-user full-32M release gate shows weaker ranking than content-based and collaborative. Treat it as a credible challenger and source of different candidates, not as the default or best-performing recommender.
 
 ### 18.9 Cluster ranking quality
 
@@ -1207,17 +1208,17 @@ diversity_strength = 0.08
 ### 19.5 Train production artifacts on all ratings
 
 ```bash
-backend/.venv/bin/python scripts/train_models.py --neural-sample-size 1000000 --neural-epochs 8
+FILMFLICKER_DATA_DIR=data/ml-32m backend/.venv/bin/python scripts/train_models.py --neural-sample-size 32000204 --neural-epochs 8
 ```
 
 ### 19.6 Run final chronological evaluation
 
 ```bash
 backend/.venv/bin/python scripts/evaluate_models.py \
-  --max-ratings 1000000 \
+  --max-ratings 0 \
   --max-rating-predictions 100000 \
   --n-eval-users 1000 \
-  --neural-sample-size 1000000 \
+  --neural-sample-size 32000204 \
   --neural-epochs 8 \
   --output models/metrics.json
 ```
@@ -1287,12 +1288,12 @@ FilmFlicker's model system is complete for its intended portfolio deployment. It
 - Leakage-resistant temporal evaluation
 - Separate validation and untouched test stages
 - Reproducible hyperparameter search
-- Production artifacts trained from the full catalog, with the neural tower using the documented rating sample
+- Production artifacts trained from the full catalog, with the neural tower trained on all 32,000,204 ratings
 - Artifact and behavior validation
 - Documented performance and limitations
 
 The strongest defensible July 24, 2026 claim is:
 
-> FilmFlicker is a production-style hybrid movie recommendation system trained on MovieLens 32M. It now includes a genuine NumPy-trained two-tower neural taste-embedding recommender, and its 1,000-user chronological release gate shows that collaborative remains the strongest primary recommender at 0.907 RMSE, 0.678 MAE, 12.2% Hit Rate@10, and 3.08% NDCG@10. The neural taste model is independently trained and different, with 43.0% mean top-10 overlap with collaborative, but it is a challenger rather than the primary model.
+> FilmFlicker is a production-style hybrid movie recommendation system trained on MovieLens 32M. It includes a genuine NumPy-trained two-tower neural taste-embedding recommender trained on all 32,000,204 ratings. Its 1,000-user full-32M chronological release gate shows that content-based matching is the strongest top-10 recommender at 1.50% Precision@10, 4.30% Recall@10, 12.5% Hit Rate@10, and 3.28% NDCG@10, while collaborative remains the best rating predictor at 0.899 RMSE and 0.672 MAE. The neural taste model is independently trained and different, with 17.3% mean top-10 overlap with collaborative, but it is a challenger rather than the primary model.
 
 It should not be described as commercially validated without real-user online experiments.
