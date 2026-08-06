@@ -5,9 +5,14 @@ pytest.importorskip("fastapi")
 from fastapi import HTTPException
 
 from backend.routers import movies, posters
+from backend.main import uptime_probe
 from backend.movie_mapper import movie_out, recommendation_out
 from src import omdb
 from src.recommenders.base import Recommendation
+
+
+def test_uptime_probe_is_lightweight():
+    assert uptime_probe() == {"status": "ok"}
 
 
 def test_poster_fetch_closes_owned_connection(monkeypatch):

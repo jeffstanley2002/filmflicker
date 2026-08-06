@@ -190,7 +190,13 @@ cd frontend && npm run lint && npm run build
 
 The root `Dockerfile` runs the API as one worker so the large read-only model cache is not duplicated. `render.yaml` declares the required secrets and readiness probe. Deploy `frontend/` separately on Vercel; `frontend/vercel.json` provides the SPA fallback. Set the production frontend origin in `ALLOWED_ORIGINS` and its API URL in `VITE_API_URL`.
 
-The `.github/workflows/keepalive.yml` workflow can ping the deployed API twice a day. Set the GitHub Actions secret `CINEMATCH_API_URL` to the deployed API origin, for example `https://filmflicker-api.onrender.com`. The `/health` endpoint checks the database, which creates regular Supabase activity. Supabase Pro is still the only guaranteed way to prevent Free Plan inactivity pauses.
+To keep a Render Free web service warm, create a Better Stack Uptime HTTP monitor that checks the lightweight liveness URL every 3 minutes:
+
+```txt
+https://filmflicker-api.onrender.com/healthz
+```
+
+Use `GET` or `HEAD`, expect HTTP `200`, and keep the monitor path on `/healthz`. This endpoint only confirms that the API process is awake; use `/health` when you want the full readiness check that verifies configuration, database connectivity, and model artifacts.
 
 Before the first production build, set all three Vercel variables: `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`. Use the exact Vercel origin (without a trailing slash) in the API's `ALLOWED_ORIGINS`.
 
