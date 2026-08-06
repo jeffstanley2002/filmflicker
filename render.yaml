@@ -5,7 +5,7 @@ services:
     plan: standard
     branch: main
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /health
+    healthCheckPath: /healthz
     autoDeployTrigger: commit
     envVars:
       - key: APP_ENV

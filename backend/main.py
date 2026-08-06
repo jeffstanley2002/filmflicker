@@ -90,6 +90,11 @@ def liveness():
     return {"status": "ok"}
 
 
+@app.get("/healthz")
+def uptime_probe():
+    return {"status": "ok"}
+
+
 @app.get("/health")
 def readiness():
     checks = {"configuration": not get_settings().validate(), "database": False, "models": False}
