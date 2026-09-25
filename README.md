@@ -1,117 +1,45 @@
-# FilmFlicker
+<p align="center">
+  <img src="frontend/public/brand/filmflicker-lockup.png" alt="FilmFlicker" width="320">
+</p>
 
-FilmFlicker is a production-oriented movie recommendation app with a React frontend, FastAPI backend, Supabase Auth, and five trained recommender strategies.
+<p align="center">
+  <strong>Personal movie recommendations powered by five different recommender models.</strong>
+</p>
 
-## Stack
+---
 
-- Frontend: React, Vite, TypeScript, Supabase Auth, Recharts
-- Backend: FastAPI, SQLAlchemy Core, Supabase Postgres
-- Models: popularity, content-based, collaborative filtering, clustering, and latent taste embeddings
-- Data: MovieLens 32M processed catalog plus committed model artifacts under `models/`
+> **Note:** FilmFlicker is no longer deployed. The live site and API were taken down to cut hosting costs, and the project is no longer actively maintained. The code is still here for anyone who wants to read it, learn from it, or run it locally.
 
-## Model Documentation
+## About
 
-For the complete model history, training formulas, tuning rounds, final metrics, deployment checks, limitations, and exact reproduction workflow, see [MODEL_TRAINING_AND_EVALUATION.md](MODEL_TRAINING_AND_EVALUATION.md).
+FilmFlicker is a full-stack movie recommendation app. You sign up, browse a catalog of tens of thousands of movies, mark what you've watched, and rate what you've seen. The more you rate, the better your recommendations get.
 
-For a module map, request/model flows, architectural invariants, and guidance on where to make common changes, see [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md).
+Instead of relying on one ranking trick, FilmFlicker runs five recommender models side by side. You can switch between them and see how each one reads your taste differently.
 
-## Local Development
+### Features
 
-Install backend dependencies:
+- **Browse**: search and filter the MovieLens catalog, with posters and metadata
+- **For You**: personalized recommendations, with a choice of which model to use
+- **Watchlist and Watched**: keep track of movies you want to see and ones you've already seen
+- **Ratings**: half-star ratings that feed straight back into your recommendations
+- **Not interested**: hide movies so they stop showing up
+- **Taste analytics**: charts of your genres, rating habits, and viewing history
+- **System design page**: a public walkthrough of how a rating turns into a recommendation
+- **Accounts**: email/password and Google sign-in through Supabase Auth, with every user's data kept separate
 
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements-dev.txt
-```
+## The models
 
-Install frontend dependencies:
+| Model | What it does |
+| --- | --- |
+| **Content-based** | Recommends movies similar to what you've rated highly, based on genres, tags, and metadata |
+| **Collaborative hybrid** | Matrix factorization over 32M ratings to find people with similar taste |
+| **Taste embeddings** | A two-tower neural recommender trained on all 32,000,204 MovieLens ratings |
+| **Popularity** | A strong baseline built on well-rated, widely-watched movies |
+| **Taste neighborhoods** | Clusters users into taste groups and recommends from your group |
 
-```bash
-cd frontend
-npm install
-cp .env.example .env.local
-```
+### Results
 
-Set `frontend/.env.local`:
-
-```bash
-VITE_API_URL=http://localhost:8000
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-```
-
-In Supabase Auth settings, keep email confirmations enabled for email/password accounts. FilmFlicker blocks unconfirmed email sessions, sends users to a check-email screen after registration, and returns confirmed users to the sign-in form.
-
-Set `backend/.env`:
-
-```bash
-DATABASE_URL=postgresql://...
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_JWT_SECRET=your-supabase-jwt-secret
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
-```
-
-Run the API:
-
-```bash
-uvicorn backend.main:app --reload
-```
-
-Run the frontend:
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open:
-
-- App: `http://localhost:5173`
-- API readiness JSON: `http://localhost:8000/metrics/system`
-
-## Supabase Schema
-
-The API applies serialized, versioned migrations from `backend/migrations/` at startup when `DATABASE_URL` is configured. The initial schema is:
-
-```sql
-create schema if not exists cinematch_v2;
-
-create table if not exists cinematch_v2.watched (
-  id serial primary key,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  movie_id integer not null,
-  watched_at timestamptz not null default now(),
-  unique (user_id, movie_id)
-);
-
-create table if not exists cinematch_v2.ratings (
-  id serial primary key,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  movie_id integer not null,
-  rating real not null check (rating between 0.5 and 5.0),
-  rated_at timestamptz not null default now(),
-  unique (user_id, movie_id)
-);
-
-create table if not exists cinematch_v2.not_interested (
-  id serial primary key,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  movie_id integer not null,
-  created_at timestamptz not null default now(),
-  unique (user_id, movie_id)
-);
-
-alter table cinematch_v2.watched enable row level security;
-alter table cinematch_v2.ratings enable row level security;
-alter table cinematch_v2.not_interested enable row level security;
-```
-
-Every API query is scoped by the verified Supabase JWT subject, so users only read and mutate their own watch, rating, and not-interested rows. The migrations also enable Row-Level Security with owner-scoped policies for `authenticated` users and lock down any legacy `public` tables left from older local-storage experiments.
-
-## Model Metrics
-
-Current metrics are generated from `models/metrics.json` using a per-user temporal holdout of each user's latest interactions. The committed metrics file contains the full-32M, 1,000-user release gate over complete histories.
+All models were evaluated on a held-out set of each user's most recent ratings (a chronological split, so no future data leaks into training), across 1,000 users from the full MovieLens 32M dataset.
 
 | Model | RMSE | Precision@10 | Recall@10 | Hit Rate@10 | NDCG@10 | Diversity |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -121,95 +49,70 @@ Current metrics are generated from `models/metrics.json` using a per-user tempor
 | Popularity | - | 0.17% | 0.44% | 1.7% | 0.43% | 56.7% |
 | Taste neighborhoods | - | 0.00% | 0.00% | 0.0% | 0.00% | 60.0% |
 
-Taste embeddings are now a genuine two-tower neural recommender trained from all 32,000,204 ratings, not an SVD-derived fallback. In the release-gate evaluation they overlap collaborative on only 17.3% of top-10 items, proving they contribute different candidate signal. Content-based matching is now the strongest top-10 recommender, while collaborative remains the stronger rating-prediction model.
+Content-based matching was the strongest top-10 recommender, while the collaborative model was best at predicting the exact rating. The neural taste embeddings overlap with collaborative filtering on only 17.3% of their top-10 picks, so the two models surface different movies.
 
-Tune only on the chronological validation split:
+## Tech stack
 
-```bash
-python scripts/tune_models.py --max-ratings 1000000 --n-validation-users 200
+- **Frontend**: React, TypeScript, Vite, Recharts
+- **Backend**: FastAPI, SQLAlchemy Core
+- **Database and auth**: Supabase (Postgres with Row-Level Security, plus Supabase Auth)
+- **ML**: NumPy, pandas, scikit-learn, trained on [MovieLens 32M](https://grouplens.org/datasets/movielens/)
+- **Hosting (formerly)**: Render for the API, Vercel for the frontend
+
+## Project structure
+
+```
+backend/     FastAPI app: routes, auth, database migrations
+frontend/    React single-page app
+src/         Recommender models and evaluation code
+scripts/     Data download, catalog building, training, tuning, and evaluation
+models/      Trained model artifacts
+tests/       Backend and recommender tests
 ```
 
-Regenerate the untouched final metrics with:
+## Running it locally
+
+You'll need Python 3, Node.js, and a free [Supabase](https://supabase.com) project.
+
+**Backend**
 
 ```bash
-FILMFLICKER_DATA_DIR=data/ml-32m python scripts/evaluate_models.py --max-ratings 0 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 32000204 --neural-epochs 8
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp backend/.env.example backend/.env   # fill in your Supabase values
+uvicorn backend.main:app --reload
 ```
 
-Validate exported model artifacts before deployment:
+`backend/.env` needs `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, and `ALLOWED_ORIGINS`. Database migrations run automatically when the API starts.
+
+**Frontend**
 
 ```bash
-python scripts/validate_model_export.py
+cd frontend
+npm install
+cp .env.example .env.local   # fill in VITE_API_URL and your Supabase keys
+npm run dev
 ```
 
-## Fresh Catalog And Retraining
+Then open http://localhost:5173.
 
-The production data architecture is:
-
-- MovieLens 32M: free catalog, ratings, tags, and links for supervised recommender training
-- Supabase: live user watch/rating events for future personalization
-
-Download a larger MovieLens training set:
+**Retraining the models (optional)**
 
 ```bash
 python scripts/download_movielens.py 32m
-```
-
-Build a normalized processed catalog. Without a TMDB key, this still writes a clean MovieLens catalog. With `TMDB_API_KEY` or `TMDB_BEARER_TOKEN`, it enriches movies with TMDB posters and metadata:
-
-```bash
 python scripts/build_catalog.py --movielens-dir data/ml-32m --tmdb-current-pages 0
-```
-
-For a fast smoke test:
-
-```bash
-python scripts/build_catalog.py --movielens-dir data/ml-latest-small --tmdb-current-pages 0
-```
-
-The free MovieLens 32M catalog currently reaches 2023. Very new releases should be added later through a separate free-or-approved catalog source plus enough interaction data to make personalization meaningful. After the processed catalog is built, retrain, evaluate, and validate export artifacts:
-
-```bash
-python scripts/tune_models.py --max-ratings 1000000 --n-validation-users 200
-# Promote the validation winner in collaborative.py and ranking.py, then:
-FILMFLICKER_DATA_DIR=data/ml-32m python scripts/train_models.py --neural-sample-size 32000204 --neural-epochs 8
-FILMFLICKER_DATA_DIR=data/ml-32m python scripts/evaluate_models.py --max-ratings 0 --n-eval-users 1000 --max-rating-predictions 100000 --neural-sample-size 32000204 --neural-epochs 8
+FILMFLICKER_DATA_DIR=data/ml-32m python scripts/train_models.py
 python scripts/validate_model_export.py
 ```
 
-The taste-embedding export is trained by the NumPy two-tower trainer in `scripts/train_models.py`; validation rejects stale `svd_embedding_fallback` artifacts.
-
-## Checks
+**Tests**
 
 ```bash
 pytest
-python scripts/validate_model_export.py
 cd frontend && npm run lint && npm run build
 ```
 
-## Deployment
+## Author
 
-The root `Dockerfile` runs the API as one worker so the large read-only model cache is not duplicated. `render.yaml` declares the required secrets and readiness probe. Deploy `frontend/` separately on Vercel; `frontend/vercel.json` provides the SPA fallback. Set the production frontend origin in `ALLOWED_ORIGINS` and its API URL in `VITE_API_URL`.
-
-To keep a Render Free web service warm, create a Better Stack Uptime HTTP monitor that checks the lightweight liveness URL every 3 minutes:
-
-```txt
-https://filmflicker-api.onrender.com/healthz
-```
-
-Use `GET` or `HEAD`, expect HTTP `200`, and keep the monitor path on `/healthz`. This endpoint only confirms that the API process is awake; use `/health` when you want the full readiness check that verifies configuration, database connectivity, and model artifacts.
-
-Before the first production build, set all three Vercel variables: `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`. Use the exact Vercel origin (without a trailing slash) in the API's `ALLOWED_ORIGINS`.
-
-The API is designed for one worker. Typical startup is about 379 MB RSS, a neural request peaks near 432 MB, and cycling through every strategy can transiently reach about 538 MB with the current artifacts. The Render Blueprint therefore pins the 2 GB `standard` plan. For another host, use at least 1 GB RAM.
-
-### First-deploy checklist
-
-1. Commit and push every source, migration, model, manifest, Docker, and hosting file.
-2. Deploy the Render API and set `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, and `ALLOWED_ORIGINS`.
-3. Confirm the deployed API's `/health` response reports configuration, database, and models ready.
-4. In Vercel, set `VITE_API_URL` to the Render HTTPS origin and set both Supabase frontend variables before building.
-5. In Supabase Auth URL Configuration, set the Site URL to the exact Vercel production origin and allow the exact `https://your-domain/app/browse` redirect used by Google sign-in.
-6. Enable/configure the Google provider in Supabase if Google sign-in should be available.
-7. Open the production site in a private browser window and smoke-test email login, Google login, Browse, For You, Watched, Taste, sign-out confirmation, and a mobile viewport.
-
-References: [Supabase redirect URL configuration](https://supabase.com/docs/guides/auth/redirect-urls), [Supabase Google login](https://supabase.com/docs/guides/auth/social-login/auth-google), and [Render instance types](https://render.com/docs/compute-plans).
+Built by [Jeffrey Stanley](https://github.com/jeffstanley2002).

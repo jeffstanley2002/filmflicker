@@ -1,10 +1,10 @@
-fastapi==0.139.0
-uvicorn[standard]==0.30.6
-pydantic==2.9.2
+fastapi==0.141.1
+uvicorn[standard]==0.52.3
+pydantic==2.13.4
 PyJWT[crypto]==2.13.0
 cryptography==50.0.0
-sqlalchemy==2.0.35
-psycopg2-binary==2.9.9
+sqlalchemy==2.0.52
+psycopg2-binary==2.9.12
 scikit-learn==1.6.1
 pandas==2.2.2
 numpy==1.26.4

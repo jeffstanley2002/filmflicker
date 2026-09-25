@@ -4,10 +4,10 @@ import {
   BarChart3,
   Boxes,
   Brain,
+  BriefcaseBusiness,
+  Code2,
   Database,
-  Github,
   Layers3,
-  Linkedin,
   LockKeyhole,
   Network,
   Radar,
@@ -247,10 +247,10 @@ export function LandingPage() {
         <span>Copyright © 2026 Jeffrey Stanley</span>
         <div>
           <a href="https://github.com/jeffstanley2002" target="_blank" rel="noreferrer" aria-label="Jeffrey Stanley on GitHub">
-            <Github size={22} />
+            <Code2 size={22} />
           </a>
           <a href="https://www.linkedin.com/in/jeffrey-stanley-148119197" target="_blank" rel="noreferrer" aria-label="Jeffrey Stanley on LinkedIn">
-            <Linkedin size={22} />
+            <BriefcaseBusiness size={22} />
           </a>
         </div>
       </footer>
