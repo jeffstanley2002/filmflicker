@@ -1,4 +1,4 @@
 # Extra dependencies for running the test suite locally / in CI.
 # Not needed to run or deploy the app itself.
 -r requirements.txt
-pytest==8.3.3
+pytest==9.1.1
